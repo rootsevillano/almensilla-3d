@@ -6,3 +6,5 @@ trimesh==5.2.0
 mapbox-earcut==2.1.0
 rasterio==1.5.2
 numpy==2.4.4
+pillow==12.2.0
+pytest==9.0.3

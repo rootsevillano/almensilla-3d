@@ -582,6 +582,34 @@ condiciones", AccessConstraints **"CC BY 4.0 scne.es"** (atribución obligatoria
 - Orden del pipeline: extract_catastro_buildings → apply_lidar_heights → dem → build_buildings → build_roads →
   build_terrain → build_trees → build_ortho_textures (descargas con download_ign.py).
 
+### 2026-10-26 · Pipeline reproducible y pruebas automáticas
+- Git: el usuario commiteó todo como «Fase 2» (`1a28562`) antes de empezar.
+- **`tools/gis/run_pipeline.py`**: ejecuta los pasos en orden con `python -P` y se para en el primer fallo;
+  `--download` (incluye download_ign, idempotente), `--from <paso>`, `--only <pasos…>`, `--sync` (npm run sync-models)
+  y `--test` (pytest). Pasos: download, extract, lidar, dem, buildings, roads, terrain, trees, ortho.
+  Ejecución completa con sync y test: **95 s** (edificios 24 s, viales 32 s).
+- **Reproducibilidad comprobada:** regenerando todo desde cero, los 182 ficheros de `data/export` y `data/processed`
+  salen idénticos byte a byte (SHA-256) a los anteriores; Git no ve cambios en los datos versionados.
+- **Pruebas** (`tests/`, pytest 9.0.3, añadido a requirements junto a pillow 12.2.0; `python -P -m pytest tests`,
+  30 pruebas en ~5 s):
+  - `conftest.py`: fixtures de sesión (GLB con trimesh, árboles, DEM) y **`TerrainSurface`**, que calcula la altura
+    con los triángulos del GLB de terreno (no con la función de muestreo del pipeline, para no ser tautológico).
+    Si falta una salida, la prueba se salta indicando que hay que ejecutar run_pipeline.
+  - `test_contracts.py`: contrato `validate_glb.py` (importado del script), cabecera GLB, estructura del JSON de
+    árboles, índice y tamaños de la ortofoto (con atribución CC BY 4.0), cobertura de ortofoto de todas las teselas de
+    terreno, y que `app/public/models` coincida con `data/export` (SHA-256).
+  - `test_geometry.py`: sin NaN/inf, nombres de nodo (`COL_`, `PARAPET_`, `ROAD_*`, `TERRAIN_`, `POOL_*`) únicos,
+    edificios estancos con volumen positivo, atributo `_floors` 1–10, suelos sin caras invertidas, aceras sin caras hacia
+    abajo, extensión y cotas comunes.
+  - `test_seams.py`: vértices y centroides de calzada/caminos/peatonal, tapas de acera (>0.1 m) y agua de piscinas sobre
+    el terreno; base de todos los edificios bajo él; árboles a <5 cm del terreno.
+  - `test_qa_criteria.py`: criterio 3 (mediana de calles principales en 6–10 m y ≥70 % de su longitud), alturas
+    verosímiles (≤25 m, ≥80 % LiDAR), metadatos del DEM, recuento y tipos de árboles. El criterio 2 (FPS) sigue siendo
+    manual con `?bench=20`.
+  - Comprobado que las pruebas fallan cuando deben: bajando la calzada 20 cm en memoria, los 800 puntos de muestra
+    quedan bajo el terreno.
+- `README.md` (antes vacío): requisitos, visor, regenerar datos, pruebas y atribución.
+
 ### Pendiente / bloqueos
 - Git: todo subido (2026-10-26). PR #2 fusionó `gis/catastro-buildings-glb` en `main`; la fase 1 y el LOD están en
   `main` (commit `19be153`). El usuario sigue gestionando Git a mano.
