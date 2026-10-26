@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GroundIndex } from './groundIndex.js';
 
 const WALK_SPEED = 3.0; // m/s (algo más rápido que la marcha real: el término mide ~6 km)
 const RUN_SPEED = 8.0;
@@ -37,6 +38,7 @@ export class CharacterController {
    */
   constructor({ character, camera, dom, ground, collider, walls }) {
     Object.assign(this, { character, camera, dom, ground, collider, walls });
+    this.groundIndex = new GroundIndex(ground);
     this.enabled = true;
     this.velocity = new THREE.Vector3();
     this.verticalSpeed = 0;
@@ -82,12 +84,9 @@ export class CharacterController {
     return KEYS[action].some((k) => this.pressed.has(k));
   }
 
-  /** Altura del suelo bajo (x, z), o null si no hay suelo (fuera del término municipal). */
-  groundHeight(x, z, fromY = 50) {
-    this.raycaster.set(new THREE.Vector3(x, fromY, z), new THREE.Vector3(0, -1, 0));
-    this.raycaster.far = fromY + 5;
-    const hit = this.raycaster.intersectObjects(this.ground, false)[0];
-    return hit ? hit.point.y : null;
+  /** Altura del suelo bajo (x, z) por debajo de fromY, o null si no hay suelo (fuera del término municipal). */
+  groundHeight(x, z, fromY = Infinity) {
+    return this.groundIndex.heightAt(x, z, fromY);
   }
 
   /** Busca un punto de calle libre en espiral alrededor de `center` para colocar al personaje. */
@@ -96,9 +95,9 @@ export class CharacterController {
     const p = new THREE.Vector3();
     for (let r = 0; r < 400; r += 3) {
       for (let a = 0; a < Math.PI * 2; a += Math.max(0.2, 3 / Math.max(r, 1))) {
-        p.set(center.x + Math.cos(a) * r, 50, center.z + Math.sin(a) * r);
+        p.set(center.x + Math.cos(a) * r, 300, center.z + Math.sin(a) * r); // relieve relativo: −29 … +36 m
         this.raycaster.set(p, new THREE.Vector3(0, -1, 0));
-        this.raycaster.far = 60;
+        this.raycaster.far = 600;
         const hit = this.raycaster.intersectObjects(roads, false)[0];
         if (!hit) continue;
         const probe = hit.point.clone();

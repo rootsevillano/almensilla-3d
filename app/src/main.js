@@ -7,16 +7,18 @@ import { applyFacades } from './facades.js';
 import { applyGroundMaterials } from './ground.js';
 import { loadTrees } from './trees.js';
 import { LodManager } from './lod.js';
+import { OrthoGround } from './ortho.js';
 import { Monigote } from './character/Monigote.js';
 import { FootprintCollider } from './character/collision.js';
 import { CharacterController } from './character/controller.js';
 
 // Parámetros de URL: ?merge=0 desactiva la fusión de edificios; ?shadows=0 desactiva las sombras;
-// ?lod=0 desactiva el nivel de detalle; ?bench=20 órbita automática de 20 s y resultado.
+// ?lod=0 desactiva el nivel de detalle; ?ortho=0 terreno sin ortofoto; ?bench=20 órbita automática de 20 s.
 const params = new URLSearchParams(window.location.search);
 const MERGE = params.get('merge') !== '0';
 const SHADOWS = params.get('shadows') !== '0';
 const LOD = params.get('lod') !== '0';
+const ORTHO = params.get('ortho') !== '0';
 const BENCH_S = Number(params.get('bench')) || 0;
 const BENCH_RADIUS_M = 900;
 const BENCH_HEIGHT_M = 420;
@@ -47,6 +49,17 @@ if (MERGE) {
 scene.add(buildingsRoot);
 applyFacades(buildingsRoot);
 applyGroundMaterials(models.terrain, models.roads);
+
+let ortho = null;
+if (ORTHO) {
+  ortho = new OrthoGround(renderer);
+  try {
+    await ortho.init(models.terrain);
+  } catch (err) {
+    console.warn('[ortho] sin ortofoto, terreno liso:', err);
+    ortho = null;
+  }
+}
 
 const trees = await loadTrees('models/almensilla_trees.json', { castShadow: SHADOWS });
 scene.add(trees.root);
@@ -107,7 +120,9 @@ function setMode(next) {
 
 // Acceso para depuración y pruebas
 const gpu = new GpuTimer(renderer.getContext());
-window.__almensilla = { scene, camera, renderer, collisionMeshes, center, character, player, shadows, gpu, lod };
+window.__almensilla = {
+  scene, camera, controls, renderer, collisionMeshes, center, character, player, shadows, gpu, lod, ortho,
+};
 
 const sceneInfo = () => {
   const { calls, triangles } = renderer.info.render;
@@ -136,7 +151,7 @@ renderer.setAnimationLoop((now) => {
     camera.lookAt(center);
     if (!bench.running) {
       const result = {
-        ...bench.result, ...gpu.summary(), merge: MERGE, shadows: SHADOWS, lod: LOD, ...sceneInfo(),
+        ...bench.result, ...gpu.summary(), merge: MERGE, shadows: SHADOWS, lod: LOD, ortho: ortho ? ortho.stats : false, ...sceneInfo(),
         viewport: `${renderer.domElement.width}x${renderer.domElement.height}`,
         pixelRatio: renderer.getPixelRatio(), load_s: +(loadMs / 1000).toFixed(2),
       };
@@ -157,6 +172,7 @@ renderer.setAnimationLoop((now) => {
   }
 
   lod?.update(camera);
+  ortho?.update(camera);
   gpu.begin();
   renderer.render(scene, camera);
   gpu.end();

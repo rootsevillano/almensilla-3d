@@ -60,10 +60,12 @@ export async function loadTrees(url, { castShadow = false } = {}) {
 
   // Agrupar instancias por tipo y tesela
   const groups = new Map();
-  for (const [x, z, type, scale] of data.trees) {
+  // y: cota del terreno en el pie; scale: escala vertical (altura LiDAR / altura del modelo); width: escala
+  // horizontal (radio de copa / radio del modelo). Con datos antiguos (4–5 campos) la escala es uniforme.
+  for (const [x, z, type, scale, y = 0, width = scale] of data.trees) {
     const key = `${type}|${Math.floor(x / TILE_M)}_${Math.floor(z / TILE_M)}`;
     if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push([x, z, scale]);
+    groups.get(key).push([x, z, scale, y, width]);
   }
 
   const root = new THREE.Group();
@@ -78,9 +80,9 @@ export async function loadTrees(url, { castShadow = false } = {}) {
     const type = data.types[Number(typeIndex)];
     const mesh = new THREE.InstancedMesh(geometries[type], material, items.length);
     mesh.name = `TREES_${type}_${tile}`;
-    items.forEach(([x, z, scale], i) => {
+    items.forEach(([x, z, scale, y, width], i) => {
       q.setFromAxisAngle(up, ((x * 12.9898 + z * 78.233) % 6.283)); // giro pseudoaleatorio estable
-      m.compose(p.set(x, 0, z), q, s.setScalar(scale));
+      m.compose(p.set(x, y - 0.1, z), q, s.set(width, scale, width)); // 10 cm hundido: no flota en ladera
       mesh.setMatrixAt(i, m);
     });
     mesh.computeBoundingSphere(); // con la geometría completa: también vale (conservadora) para la de LOD

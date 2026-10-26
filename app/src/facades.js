@@ -1,14 +1,18 @@
 import * as THREE from 'three';
 
 // Fachadas de pueblo andaluz dibujadas en el shader (sin texturas ni geometría extra):
-// encalado, zócalo, una ventana con reja por hueco de ~3.2 m en cada planta de 3 m y cornisa.
-// Para cada cara vertical se calcula al cargar su coordenada a lo largo del muro (u), la longitud del muro
-// y la altura de coronación (atributo `facade`); las cubiertas y los pretiles se distinguen por su orientación
-// y por su cota de arranque.
-const FLOOR_H = 3.0; // contrato del agente 01: plantas × 3 m
+// encalado, zócalo, una ventana con reja por hueco de ~3.2 m en cada planta y cornisa.
+// Para cada cara vertical se calcula al cargar su coordenada a lo largo del muro (u), la longitud del muro, la cota
+// del suelo junto al muro (atributo `facade`), la altura de coronación sobre ese suelo y las plantas de la parte
+// (`facadeTop` = (coronación, plantas); las plantas vienen del atributo `_floors` del GLB). Altura de planta =
+// coronación / plantas: con alturas LiDAR una casa de 1 planta mide ~4 m y un bloque de 4 plantas ~15 m.
+// Con relieve, los muros no arrancan en Y=0 sino 0.3 m bajo el terreno (FOUNDATION_SINK_M de build_buildings_glb.py).
+// Las cubiertas se distinguen por su orientación; los pretiles van en mallas aparte (PARAPET_*).
+const LEGACY_FLOOR_H = 3.0; // si el GLB no trae `_floors`: plantas ≈ coronación / 3 m
 const BAY_M = 3.2;
+const FOUNDATION_SINK_M = 0.3;
 
-const KIND = { wall: 0, roof: 1, parapet: 2 };
+const KIND = { wall: 0, roof: 1 };
 
 // Variantes por material de uso (nombres de los GLB del agente 01)
 const VARIANTS = {
@@ -21,10 +25,12 @@ const VARIANTS = {
   MAT_2_agriculture: 'shed',
 };
 
-/** Añade el atributo `facade` (u, longitud de muro, tipo, coronación) a una geometría no indexada. */
+/** Añade `facade` (u, longitud de muro, tipo, cota del suelo) y `facadeTop` (coronación sobre el suelo, plantas). */
 function addFacadeAttribute(geometry) {
   const pos = geometry.attributes.position;
+  const floorsAttr = geometry.attributes._floors;
   const out = new Float32Array(pos.count * 4);
+  const tops = new Float32Array(pos.count * 2);
   const a = new THREE.Vector3();
   const b = new THREE.Vector3();
   const c = new THREE.Vector3();
@@ -52,21 +58,31 @@ function addFacadeAttribute(geometry) {
       const uMin = Math.min(...u);
       wallLen = Math.max(...u) - uMin;
       u = u.map((x) => x - uMin);
-      kind = minY > 0.3 ? KIND.parapet : KIND.wall; // los muros de cada parte arrancan en Y=0
+      kind = KIND.wall;
     }
-    for (let k = 0; k < 3; k++) out.set([u[k], wallLen, kind, maxY], (i + k) * 4);
+    const ground = minY + FOUNDATION_SINK_M; // los muros de cada parte arrancan bajo el terreno
+    const top = maxY - ground;
+    const floors = floorsAttr ? Math.max(1, floorsAttr.getX(i)) : Math.max(1, Math.round(top / LEGACY_FLOOR_H));
+    for (let k = 0; k < 3; k++) {
+      out.set([u[k], wallLen, kind, ground], (i + k) * 4);
+      tops.set([top, floors], (i + k) * 2);
+    }
   }
   geometry.setAttribute('facade', new THREE.BufferAttribute(out, 4));
+  geometry.setAttribute('facadeTop', new THREE.BufferAttribute(tops, 2));
 }
 
 const VERTEX_HEAD = /* glsl */ `
 attribute vec4 facade;
+attribute vec2 facadeTop;
 varying vec4 vFacade;
+varying vec2 vTop;
 varying float vWorldY;
 `;
 
 const FRAGMENT_HEAD = /* glsl */ `
 varying vec4 vFacade;
+varying vec2 vTop;
 varying float vWorldY;
 uniform vec3 uWall;
 uniform vec3 uSocle;
@@ -84,25 +100,28 @@ const FRAGMENT_BODY = /* glsl */ `
   } else if (kind < 0.5) {
     float u = vFacade.x;
     float wallLen = vFacade.y;
-    float top = vFacade.w;
-    float y = vWorldY;
+    float top = vTop.x;             // coronación sobre el suelo junto al muro
+    float floors = vTop.y;          // plantas de Catastro de esta parte
+    float y = vWorldY - vFacade.w;  // altura sobre ese suelo
     if (y < SOCLE_H) col = uSocle;
     if (top > 2.0 && top - y < 0.22) col = uWall * 0.9;   // cornisa
 #ifdef WINDOWS
-    float level = floor(y / ${FLOOR_H.toFixed(1)});
-    float fy = y - level * ${FLOOR_H.toFixed(1)};
+    float floorH = clamp(top / floors, 2.4, 6.0);  // altura de planta real de la parte
+    float level = floor(y / floorH);
+    float fy = y - level * floorH;
     float bays = floor(wallLen / ${BAY_M.toFixed(1)});
-    if (bays >= 1.0 && level * ${FLOOR_H.toFixed(1)} + 2.4 <= top + 0.01) {
+    if (bays >= 1.0 && level < floors - 0.5) {
       float slot = wallLen / bays;
       float su = mod(u, slot) - 0.5 * slot;
+      // proporciones a partir de una planta de 3 m (alféizar 0.96 m, hueco 1.30 m), escaladas a floorH
   #ifdef SHOP
       float hw = level < 0.5 ? min(1.4, 0.4 * slot) : 0.55;
-      float y0 = level < 0.5 ? 0.35 : 0.95;
-      float y1 = level < 0.5 ? 2.6 : 2.25;
+      float y0 = level < 0.5 ? 0.12 * floorH : 0.32 * floorH;
+      float y1 = level < 0.5 ? 0.87 * floorH : y0 + min(1.3, 0.45 * floorH);
   #else
       float hw = 0.55;
-      float y0 = 0.95;
-      float y1 = 2.25;
+      float y0 = 0.32 * floorH;
+      float y1 = y0 + min(1.3, 0.45 * floorH);
   #endif
       if (abs(su) < hw && fy > y0 && fy < y1) {
         float edge = min(hw - abs(su), min(fy - y0, y1 - fy));
@@ -138,7 +157,7 @@ function facadeMaterial(base, variant) {
     if (variant === 'shop') shader.defines.SHOP = '';
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>\n${VERTEX_HEAD}`)
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFacade = facade;\nvWorldY = position.y;');
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFacade = facade;\nvTop = facadeTop;\nvWorldY = position.y;');
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>\n${FRAGMENT_HEAD}`)
       .replace('#include <color_fragment>', `#include <color_fragment>\n${FRAGMENT_BODY}`);

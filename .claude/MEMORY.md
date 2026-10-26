@@ -396,8 +396,195 @@ IGN/CNIG (ortofoto PNOA, LiDAR, MDT05; CC BY 4.0); (3) edificios singulares, mob
   a 2400×1350). Si hiciera falta más: LOD de edificios lejanos (sin shader de ventanas o cajas simplificadas por
   tesela), bajar el pixel ratio en la vista aérea o reducir el radio de la niebla.
 
+### 2026-10-26 · Fase 2 — fuentes IGN/CNIG verificadas (sin descargar nada todavía)
+Comprobado leyendo GetCapabilities/DescribeCoverage de los propios servicios. Todos: Fees "No se aplican
+condiciones", AccessConstraints **"CC BY 4.0 scne.es"** (atribución obligatoria: © Instituto Geográfico Nacional / scne.es).
+- **Ortofoto PNOA máxima actualidad (WMS 1.3.0):** `https://www.ign.es/wms-inspire/pnoa-ma`, capa
+  `OI.OrthoimageCoverage` (también `OI.MosaicElement` con fechas de vuelo), admite **EPSG:25829**, máx. 4096×4096 px,
+  formatos jpeg/png/tiff. Mosaico de vuelos de distintas fechas a 25 y 50 cm. WMTS equivalente: `https://www.ign.es/wmts/pnoa-ma`.
+- **MDT (WCS 2.0.1):** `https://servicios.idee.es/wcs-inspire/mdt`. Coberturas `Elevacion25830_5` (MDT05, 5 m,
+  EPSG:25830, COG), `Elevacion4258_5`, y mallas de 25/200/500/1000 m. **No hay EPSG:25829 ni 2 m** en este servicio:
+  hay que reproyectar de 25830 a 25829.
+- **MDS (WCS 2.0.1):** `https://wcs-mds.idee.es/mds`. Coberturas `mds05` (superficie 5 m, EPSG:25830),
+  **`mdsn_e025`** (MDS normalizado de **edificación**, altura sobre el suelo, 2.5 m) y **`mdsn_v025`** (MDS normalizado de
+  **vegetación**, 2.5 m), ambas en **EPSG:3042** (UTM 30 con orden de ejes N, E: cuidado al hacer SUBSET). TIFF.
+  Según el catálogo, el MDSn procede de la **primera cobertura LiDAR (2008–2015)**: los edificios posteriores
+  (p. ej. sector F) no tendrán altura → mantener las plantas de Catastro como respaldo.
+- LiDAR en nube de puntos (LAZ, hojas de 2×2 km; en Andalucía la 2.ª cobertura se voló en 2020–2021) solo está en el
+  Centro de Descargas del CNIG (descarga interactiva): no hace falta si se usan los MDSn.
+- **Tamaños estimados** (bbox del término + 100 m en EPSG:25830: 220751 4130931 227437 4135759, 6685 × 4827 m):
+  MDSn 2.5 m → 2674×1930 px, ~20 MB float32 cada uno; MDT05 → 1337×965 px, ~5 MB; ortofoto a 0.5 m → 85 teselas de
+  500 m (las que tocan el término) de 1000×1000 px, ~30–45 MB en JPEG. Total ~70–90 MB en `data/raw/ign/`.
+- **Memoria GPU de la ortofoto:** 85 × 1024² RGBA con mipmaps ≈ 475 MB → inviable entera; hará falta cargar a resolución
+  completa solo las teselas cercanas y una versión de 256 px para el resto.
+- Dependencia nueva necesaria: `rasterio` (leer y reproyectar GeoTIFF). Pillow ya está instalado.
+
+### 2026-10-26 · Fase 2 — descargas (autorizadas por el usuario) e inspección
+- Instalado `rasterio` 1.5.2 (GDAL 3.12.2; añadir a `requirements.txt` cuando se use en el pipeline).
+- `tools/gis/download_ign.py`: descarga reproducible e idempotente (no repite ficheros existentes, comprueba que la
+  respuesta es imagen y no un ExceptionReport, 3 reintentos, pausa de 0.25 s) y escribe `data/raw/ign/manifest.json`
+  (URL, tipo, bytes, fecha UTC de cada fichero; licencia; bbox). `--only dem|ortho`.
+- **Elevaciones** (bbox EPSG:25830 220751.4 4130931.2 227436.5 4135758.6, ~23 MB en total):
+  - `mdt05_25830.tif`: 1337×965, **int16 en metros enteros** (cuantizado a 1 m: suavizar para evitar terrazas),
+    sin nodata, sin compresión. Cota 11–81 m (mediana 44): ~70 m de desnivel en el término (cornisa del Aljarafe).
+  - `mdsn_e025_3042.tif` / `mdsn_v025_3042.tif`: 2672×1929, 2.5 m, int16 en **metros enteros**, sin nodata;
+    edificación 0–22 m (>0 en el 2.5 % del área); vegetación 0–30 m (>0 en el 33 %). Ficheros distintos (md5).
+  - **Ejes de EPSG:3042**: GetCoverage con `SUBSET=y(N)&SUBSET=x(E)`; rasterio devuelve bounds en orden E,N correctamente.
+- **Validación del MDSn de edificación contra el Catastro** (reproyectado a 1 m en EPSG:25829):
+  IoU huellas / MDSn≥2 m = 0.45 sin desplazar, 0.47 en el mejor desplazamiento (1 m, menos de un píxel): bien
+  georreferenciado. Mediana de altura LiDAR por plantas: 1 → 4.0 m, 2 → 7.0, 3 → 9.0, 4 → 15, 5 → 18; LiDAR / (plantas·3)
+  = 1.17 (incluye pretil y cubierta). Hay altura LiDAR en edificios construidos hasta ~2020 (p99 del año), así que
+  el MDSn servido parece del vuelo 2020–2021, más reciente de lo que dice el catálogo. 935 partes con plantas no
+  tienen MDSn≥2 m (anexos bajos, tapados por árboles…): respaldo con plantas × 3 m.
+- **Trampa:** los GeoJSON locales sin CRS se leen con CRS84 asignado por el driver; para pasarlos a EPSG:25829 hay que
+  sumar el origen y usar `set_crs(25829, allow_override=True)`.
+- **Ortofoto PNOA**: 85 teselas de 1000×1000 px (0.5 m) en `data/raw/ign/pnoa/pnoa_<i>_<j>.jpg`, 118–279 KB cada una.
+  El servidor WMS es lento (~10 s por tesela, 16 min la primera pasada) y devuelve **502 Bad Gateway** de forma
+  intermitente (18 de 85 en la primera pasada). **Trampa:** un proxy de caché del IGN guarda el 502 por URL exacta y lo
+  sigue sirviendo; `download_ign.py` alterna en cada reintento la precisión del BBOX (2, 1 y 0 decimales: misma zona,
+  otra clave de caché). Con eso entraron las dos últimas (`pnoa_0_3` con 1 decimal).
+  **Completo: 85/85 teselas** (109–279 KB), ninguna en blanco ni de tamaño erróneo; `data/raw/ign/` = 39.7 MB
+  (manifiesto con 88 entradas). Encaje con las huellas del Catastro comprobado visualmente (tesela `pnoa_1_0`):
+  tejados y piscinas coinciden; se distinguen los olivos uno a uno.
+- `rasterio==1.5.2` añadido a `tools/gis/requirements.txt`.
+### 2026-10-26 · Ortofoto PNOA como textura del terreno
+- `tools/gis/build_ortho_textures.py` (agente 01): de cada `pnoa_<i>_<j>.jpg` (1000 px) genera
+  `data/export/ortho/hi/` (1024 px, ~0.49 m/px, JPEG q85, 23.7 MB en total) y `lo/` (256 px, ~1.95 m/px, q82, 1.7 MB),
+  más `index.json` (teselas, tamaños, orientación fila 0 = norte, atribución). `sync-models` comprueba que el índice
+  es coherente y que están las 170 texturas, y copia todo a `app/public/models/ortho/` (25.4 MB).
+- `app/src/ortho.js` (`OrthoGround`, agente 02): genera UV en cada `TERRAIN_<i>_<j>` a partir de su posición
+  (u = (X − i·500)/500, v = (−Z − j·500)/500), un material por tesela con la textura de 256 px al arrancar; carga la de
+  1024 px si la cámara está a menos de 300 m de la tesela y la libera (dispose) a más de 550 m; máx. 3 cargas
+  simultáneas, por cercanía. Filtrado anisótropo al máximo. Grano procedural en coordenadas de mundo (dos octavas de
+  ruido, ±14 %) que se desvanece con la distancia: un único programa (`ortho-detail`) para las 85 teselas.
+  `?ortho=0` lo desactiva. Memoria GPU estimada: 6 teselas en alta (~34 MB) + 85 en baja (~30 MB).
+- Atribución obligatoria en `index.html` (`#attribution`, abajo a la derecha): IGN (CC BY 4.0 scne.es), Catastro y
+  OpenStreetMap (ODbL).
+- **Limitaciones vistas:** a pie la ortofoto se ve borrosa de cerca (0.5 m/px) y trae "horneados" sombras, coches y algún
+  tejado desplazado por el relieve de la foto. Desde el aire el salto de realismo es grande (campos, jardines, olivar).
+- **Medidas** (FPS reales, 1080p emulado, lienzo 2400×1350, misma sesión):
+
+  | Escena | FPS medio | 1 % low | GPU p50 / p99 |
+  |---|---|---|---|
+  | `?bench=20` órbita, con ortofoto (0 teselas en alta: la cámara está a >420 m) | 95.9 | 71.4 | 7.08 / 9.48 ms |
+  | `?bench=20` órbita, `?ortho=0` | 104.8 | 71.4 | 6.80 / 9.31 ms |
+  | Personaje, con ortofoto (6 teselas en alta) | 141.3 | 71.9 | 4.13 / 5.65 ms |
+  | Personaje, `?ortho=0` | 139.5 | 71.9 | 4.41 / 6.26 ms |
+
+  Coste de la ortofoto: ~0.3 ms de GPU en la órbita y nada medible a pie. La diferencia de FPS medios en la órbita es
+  mayor porque la GPU está justo en el umbral de 6.94 ms (144 Hz). La GPU de esta sesión rinde distinto a la anterior:
+  comparar siempre dentro de la misma sesión.
+### 2026-10-26 · Alturas reales de edificios (MDSn de edificación)
+- **Cambio de regla de altura pedido por el usuario:** prioridad a la altura LiDAR; plantas × 3 m solo como respaldo.
+  Esto se aparta del "Contrato de Salida" 2 de `.claude/agents/01_gis_pipeline.md` (que solo habla de plantas × 3 m):
+  conviene que el usuario actualice ese contrato.
+- `tools/gis/apply_lidar_heights.py` (agente 01), entre `extract_catastro_buildings.py` y `build_buildings_glb.py`.
+  Actualiza `catastro_building_parts.geojson` en su sitio (idempotente: guarda `height_catastro_m` y
+  `height_source_catastro`; dos pasadas dan lo mismo). Por parte: huella erosionada 0.5 m rasterizada sobre la malla de
+  2.5 m (centro de píxel), mediana de los píxeles ≥1.5 m. Se acepta si hay ≥1 píxel, ≥50 % son de edificación y la
+  altura está entre 0.6·(plantas·3) − 1 y 2·(plantas·3) + 3 m. Las partes sin muestra propia toman la mediana LiDAR de
+  las partes del mismo edificio con las mismas plantas (`lidar_building`). Columnas nuevas: `lidar_height_m`,
+  `lidar_pixels`, `lidar_building_share`, `lidar_status`.
+  (Con erosión 0.75 m y ≥2 píxeles, el 52 % de las partes quedaba sin muestra: el Catastro las divide mucho.)
+- **Resultado** (10 574 partes): `lidar` 6639, `lidar_building` 2696 (90 % de las partes con plantas), `catastro_floors`
+  1055 (respaldo), `catastro_zero_floors` 184. Estados: ok 6639, too_small 692, no_building_in_lidar 337,
+  implausible 26, zero_floors 184. Diferencia LiDAR − Catastro: p5 −1, p50 +1, p95 +4 m. Mediana por plantas:
+  1 → 4.0, 2 → 7.0, 3 → 9.0, 4 → 15, 5 → 18 m. Altura máxima 19 m (19.9 con pretil).
+  Los rechazos "implausible" son casi todos de `5540801QB5354S` (residencial de 2009, 127 viviendas): partes bajas de
+  1 planta pegadas a las torres, cuyos píxeles recogen la altura de la torre vecina → se quedan en 3 m (correcto).
+  84 de 2565 grupos edificio+plantas con varias partes tienen más de 3 m de rango (escalones reales).
+- GLB de edificios: 9.78 MB, 461 k triángulos, 9135 piezas de pretil. Contrato OK; 0 NaN, 0 volumen negativo, todas
+  estancas. Sin cambios en la colisión (las huellas no cambian).
+- El shader de fachadas sigue suponiendo plantas de 3 m: en edificios de 4 plantas con 15 m de LiDAR dibuja 5 filas
+  de ventanas. Mejora posible: pasar el nº de plantas por vértice.
+- **Medidas** (1080p emulado, lienzo 2400×1350): `?bench=20` órbita 111.2 FPS medio, 1 % low 71.4, GPU 6.33 ms p50;
+  a pie 141.4 FPS, 1 % low 71.9, GPU 4.14 ms p50 (antes de las alturas LiDAR: 4.13 ms) → sin coste.
+### 2026-10-26 · Relieve real (MDT05)
+- **`tools/gis/dem.py`** (agente 01): reproyección bilineal del MDT05 a una malla local de 5 m en EPSG:25829 alineada
+  con el origen (x0 = −3190, y1 = 2195, 1276×878), 80 m de margen (el MDT se descargó con 100 m; con 250 m faltaban
+  datos), suavizado gaussiano separable en numpy (no hay scipy; sigma 3 celdas = 15 m) y **cota cero = 43 m** (terreno
+  en el origen). Salida `data/processed/dem_local.tif` (float32, relativo) + `dem_local.json`. Relativo −28.9 … +36.2 m.
+  El suavizado mueve el MDT p50 0.19 m, p99 0.87 m, máx 3.8 m (cornisa); el sombreado confirma que desaparecen las
+  terrazas de la cuantización entera sin perder valles ni terraplenes.
+  `LocalDEM.sample(x, y)` (bilineal) y **`LocalDEM.sample_mesh(x, y)`**: altura de la malla del terreno tal como se
+  dibuja (lineal por triángulos). **`MESH_CELL_M = 20`** en `dem.py` es la única fuente del tamaño de celda.
+- **Terreno** (`build_terrain_glb.py`): **continuo, sin recortar viales ni piscinas** (recortar con relieve deja grietas
+  en las costuras); malla regular de 20 m por tesela (celdas interiores como cuadrícula compartida, las del borde
+  recortadas y trianguladas sin densificar para compartir vértices). 72.6 k triángulos (con 10 m eran 284 k), 2.39 MB.
+  Piscinas: lámina **horizontal** a la cota máxima de la malla bajo la piscina + 3 cm; borde extruido desde 15 cm bajo
+  el terreno hasta 6 cm sobre el agua.
+- **Viales** (`build_roads_glb.py`): a 0.06 m sobre la malla del terreno. **Trampa:** drapear solo los vértices no
+  basta: earcut une vértices lejanos de una franja larga y en ladera el triángulo atravesaba el terreno (hasta 4.6 m
+  bajo él en el centroide); y muestrear el MDT bilineal en vez de la malla dejaba la calzada hasta 22 cm bajo el
+  terreno en los terraplenes. Solución: `split_by_terrain_triangles` recorta cada superficie con los triángulos de la
+  malla del terreno (cada trozo en un único plano) y se muestrea con `sample_mesh` → paralelo al terreno en todos sus
+  puntos. Aceras: tapa recortada igual a +0.21 m y bordillos levantados tramo a tramo (cada 4 m; con 1 m eran 317 k
+  triángulos solo de bordillo). Viales: 132 k triángulos, 3.1 MB.
+- **Edificios** (`build_buildings_glb.py`): cada parte arranca 0.3 m bajo el punto más bajo de la malla del terreno en su
+  contorno y su cubierta queda a la cota mediana del terreno + `height_m`; pretiles sobre esa cubierta. 10.03 MB.
+- **Árboles** (`build_trees.py`): quinto campo `y` = cota de la malla del terreno (formato `[x, z, tipo, escala, y]`;
+  `sync-models` acepta 4 o 5 campos); el visor los hunde 10 cm.
+- **Visor** (agente 02/03):
+  - `facades.js`: atributos `facade` (u, longitud, tipo, cota del suelo = arranque + 0.3) y `facadeTop` (coronación
+    sobre el suelo); ventanas, zócalo y cornisa se miden desde el suelo del muro, no desde Y = 0.
+  - `collision.js`: la arista inferior de cada muro se toma por la cota mínima del triángulo (antes Y < 0.05).
+  - **`character/groundIndex.js` (`GroundIndex`)**: rejilla en planta de 5 m con los triángulos de TERRAIN_/ROAD_/
+    POOL_; altura por baricéntricas, la superficie más alta bajo `fromY`. **Trampa:** el Raycaster de Three.js tardaba
+    4.3 ms por consulta (el rayo vertical cruza las esferas de 11 teselas y prueba todos sus triángulos) y
+    `player.update` subía a 9.5 ms → 82 FPS a pie con la GPU en 5 ms. Con el índice: 0.3 ms. Además el rayo tenía
+    `far = fromY + 5`, que con cotas negativas (zonas bajas) daba alcance negativo y dejaba sin suelo al personaje.
+  - `controller.js`: aparición buscando suelo desde Y = 300. `ortho.js`: caja de distancia con las cotas reales.
+  - `ground.js`: materiales de viales y piscinas con `polygonOffset` (−2, −4), porque van encima del terreno continuo.
+- **QA** (`qa_relief`, muestreando la malla del terreno exacta): vértices y centroides de calzada, aceras, caminos y
+  peatonal a +0.060 m en todos los puntos (0 bajo el terreno); agua de piscinas ≥ +0.030 m; ningún edificio con vértice
+  inferior sobre el terreno (mín. 0.10 m enterrado). Contratos OK; 0 NaN; edificios estancos; 11 astillas casi
+  verticales (<0.12 m²) en el borde del término, no invertidas. Personaje: sigue el terreno (26.8 m corriendo, Y de
+  3.08 a 2.00 y apoyado), colisión intacta (64 754 muros, se detiene a 0.320 m del muro).
+- **Medidas** (1080p emulado, lienzo 2400×1350): a pie 142.1 FPS, 1 % low 72.5, GPU 4.51 ms (sin relieve 4.14);
+  `?bench=20` órbita 90.9 FPS, 1 % low 70.9, GPU 8.37 ms (sin relieve 6.33; el terreno continuo se dibuja también bajo
+  los viales). Cumple ≥60 FPS.
+### 2026-10-26 · Árboles reales (MDSn de vegetación)
+- **`tools/gis/lidar_trees.py`** (agente 01): MDSn de vegetación reproyectado (vecino más próximo, para no rebajar
+  cimas) a malla local de 2.5 m; cima = píxel ≥ 2 m que es máximo de su ventana 3×3 (5×5 si supera 7 m), ordenando por
+  `altura + 0.01·gaussiana(σ 0.7 px)` para desempatar las mesetas de valores enteros. Radio de copa por alometría
+  `clip(0.35·h + 0.5, 1.2, 6)`. 141 987 cimas en el rectángulo del término.
+  **Trampa:** umbralizar la altura suavizada (versión inicial, 2.5 m) borraba casi todos los olivos: dan 2–3 m en el
+  dato entero y un píxel aislado de 3 m rodeado de ceros queda en ~1 m tras el gaussiano. Validado dibujando las cimas
+  sobre la ortofoto: en el casco caen sobre las copas de los jardines; en el olivar salen casi todos los olivos de las
+  hileras; de los árboles dispersos de algunas parcelas de secano salen pocos (bajos o posteriores al vuelo).
+- **`build_trees.py --source lidar`** (por defecto; `--source osm` conserva el método de la fase 1): se descartan los
+  que caen en edificios (+0.5 m), calzada, caminos, piscinas o fuera del término; los de acera se mantienen (alcorques).
+  Tipo por contexto: huerto OSM → olivo, bosque → pino, parque/jardín → sombra, matorral ≤3 m → arbusto, casco urbano →
+  sombra, campo → olivo hasta 5 m y sombra si es más alto. Escala vertical = altura / altura del modelo y horizontal =
+  radio / radio del modelo (constantes `MODEL_TOP_M` / `MODEL_RADIUS_M`, que deben seguir a `SHAPES` de `trees.js`).
+  Resultado: **72 464 árboles** (61 246 olivos, 11 006 de sombra, 142 pinos, 70 arbustos), altura p50 3 m, p95 5 m,
+  máx. 30 m. JSON con 6 campos `[x, z, tipo, escala, y, ancho]`, 2.4 MB; `sync-models` acepta de 4 a 6 campos.
+- Visor: `trees.js` compone cada instancia con escala (ancho, escala, ancho). LOD sin cambios (sombra < 220 m, copa
+  simple > 350 m, ocultos > 2200 m): 163 mallas, a pie ~11 teselas en alta y 6 con sombra.
+- **Medidas** (1080p emulado): `?bench=20` órbita 83.9 FPS medio, 1 % low 69.4, GPU 8.97 ms (con los árboles de OSM:
+  8.37); a pie 135.9 FPS, 1 % low 71.9, GPU 5.15 ms (antes 4.51). Cumple ≥60 FPS; coste ~0.6 ms por pasar de 30 k a 72 k
+  árboles.
+### 2026-10-26 · Ventanas por planta real
+- `build_buildings_glb.py`: atributo de vértice con las plantas de Catastro de cada parte (`mesh.vertex_attributes
+  ["floors"]`, concatenado en el mismo orden que los vértices). trimesh lo exporta como atributo glTF **`_floors`**
+  (minúsculas, no `_FLOORS`) y el GLTFLoader lo carga como `geometry.attributes._floors`. Partes con plantas nulas → 1.
+  Valores: 1–5 plantas en las 2793 mallas `COL_`. GLB de edificios 10.46 MB.
+- `facades.js`: `facadeTop` pasa a vec2 (coronación sobre el suelo, plantas). Altura de planta =
+  `clamp(coronación / plantas, 2.4, 6)`; se dibujan tantas filas como plantas; alféizar a 0.32·planta y hueco
+  `min(1.3, 0.45·planta)` (en 3 m: 0.96–2.26, igual que antes); escaparates de planta baja a 0.12–0.87·planta. Sin
+  `_floors` (GLB antiguo) las plantas se estiman como coronación / 3 m.
+- Comprobado en el visor: el bloque de 4 plantas y 15 m de `5540801QB5354S` muestra 4 filas de ventanas (antes 5) y las
+  casas de una planta (≈4 m) una sola fila. Los tres programas de fachada (house, shop, shed) compilan.
+- **Trampa de depuración:** la consola del panel conserva errores de recargas en caliente antiguas (misma marca `?t=`);
+  comprobar con `renderer.info.programs` o con un error nuevo antes de buscar fallos. `window.__almensilla.controls`
+  expuesto para colocar la cámara en vista aérea (OrbitControls reorienta la cámara a su objetivo en cada fotograma).
+- FPS no vuelto a medir: el cambio solo añade un float por vértice y unas operaciones en el shader.
+- Orden del pipeline: extract_catastro_buildings → apply_lidar_heights → dem → build_buildings → build_roads →
+  build_terrain → build_trees → build_ortho_textures (descargas con download_ign.py).
+
 ### Pendiente / bloqueos
-- Push/PR de los cambios de viales, terreno, visor, personaje, sombras, fase 1 y LOD: lo hace el usuario a mano.
+- Git: todo subido (2026-10-26). PR #2 fusionó `gis/catastro-buildings-glb` en `main`; la fase 1 y el LOD están en
+  `main` (commit `19be153`). El usuario sigue gestionando Git a mano.
 - Fase 1, cosas que faltan: puertas (se podrían colocar en las 3131 entradas de portal de AD), pasos de cebra
   (93 nodos `crossing`), árboles de alineación en aceras (no están en OSM), colisión con árboles, el personaje
   "flota" sobre el agua de las piscinas, tejados de teja.

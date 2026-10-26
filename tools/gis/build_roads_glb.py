@@ -13,7 +13,7 @@ y se usa la mediana por vía, acotada al rango de su clase. Fuera del casco: val
 
 Salidas:
   * `data/processed/osm_roads.geojson`  ejes en coordenadas locales con `width_m` y `width_source`.
-  * `data/export/almensilla_roads.glb`   superficies planas en Y=ROAD_Y, recortadas al término municipal
+  * `data/export/almensilla_roads.glb`   superficies drapeadas sobre el MDT (`dem.py`) a ROAD_Y sobre el terreno, recortadas al término municipal
     (unión de CadastralZoning) y sin las huellas de Building, en teselas de TILE_M; en calles urbanas la
     calzada se separa de las aceras (losas de 15 cm cuyo canto es el bordillo, `ROAD_sidewalk_*`); nodos `ROAD_<grupo>_<i>_<j>` (caminable, sin `COL_`).
     Ejes glTF: X = Este, Y = arriba, Z = -Norte (igual que almensilla_buildings.glb).
@@ -39,6 +39,9 @@ import trimesh
 from pyproj import Transformer
 from shapely.geometry import LineString, MultiPolygon, Polygon, box
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from dem import MESH_CELL_M, LocalDEM  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OSM = ROOT / "data/raw/osm/almensilla con sector f.osm"
 DEFAULT_CP_ZIP = ROOT / "data/raw/catastro/A.ES.SDGC.CP.41010.zip"
@@ -49,7 +52,8 @@ DEFAULT_OUTPUT = ROOT / "data/export/almensilla_roads.glb"
 DEFAULT_ORIGIN = (755870.0, 4132708.0)
 
 TILE_M = 500.0
-ROAD_Y = 0.02  # por encima de la rasante para evitar z-fighting con el futuro terreno
+ROAD_Y = 0.06  # sobre el terreno (continuo, sin recortar): el visor añade además un desfase de profundidad
+DRAPE_SEGMENT_M = 4.0  # densificación de bordes al drapear sobre el MDT (suavizado a 15 m)
 SAMPLE_STEP_M = 10.0
 RAY_MAX_M = 40.0
 URBAN_PAD_M = 40.0  # manzanas + margen = envolvente del casco (las calles quedan entre manzanas)
@@ -260,20 +264,62 @@ def split_sidewalks(roads: gpd.GeoDataFrame, carriageway) -> tuple:
     return carriageway.difference(sidewalk), sidewalk
 
 
-def curb_mesh(polys: list[Polygon], y: float, height: float) -> trimesh.Trimesh | None:
-    """Aceras como losas extruidas: la cara lateral es el bordillo."""
+TERRAIN_CELL_M = MESH_CELL_M  # malla de build_terrain_glb.py (cuadrícula global partida por la diagonal (a,c))
+
+
+def split_by_terrain_triangles(polys: list[Polygon], cell: float = TERRAIN_CELL_M) -> list[Polygon]:
+    """Recorta los polígonos con los triángulos de la malla del terreno: cada trozo queda dentro de un único plano
+    del terreno, así que lo que se drapea queda paralelo a él en todos sus puntos. (Drapear solo los vértices no
+    basta: earcut une vértices lejanos de una franja larga y en ladera el triángulo atravesaba el terreno, hasta
+    4.6 m bajo él en el centro.)"""
+    pieces = []
+    for poly in polys:
+        minx, miny, maxx, maxy = poly.bounds
+        xs = np.arange(np.floor(minx / cell), np.ceil(maxx / cell)) * cell
+        ys = np.arange(np.floor(miny / cell), np.ceil(maxy / cell)) * cell
+        gx, gy = np.meshgrid(xs, ys)
+        gx, gy = gx.ravel(), gy.ravel()
+        a, b = np.c_[gx, gy], np.c_[gx + cell, gy]
+        c, d = np.c_[gx + cell, gy + cell], np.c_[gx, gy + cell]
+        tris = shapely.polygons(np.r_[np.stack([a, b, c, a], 1), np.stack([a, c, d, a], 1)])
+        shapely.prepare(poly)
+        tris = tris[shapely.intersects(poly, tris)]
+        pieces += [p for g in shapely.intersection(tris, poly) for p in polygons_of(g) if p.area > 1e-4]
+    return pieces
+
+
+def curb_mesh(polys: list[Polygon], y: float, height: float, dem=None) -> trimesh.Trimesh | None:
+    """Losas extruidas cuya cara lateral es el bordillo. Sin `dem` (p. ej. el borde de las piscinas): extrusión
+    horizontal a la cota y. Con `dem`: tapa drapeada sobre la malla del terreno a y + height y bordillos tramo a
+    tramo (cada DRAPE_SEGMENT_M) desde y hasta y + height sobre el terreno; sin cara inferior (apoya en el terreno)."""
     meshes = []
     for poly in polys:
         if poly.area < 0.05:
             continue
-        mesh = trimesh.creation.extrude_polygon(poly, height)
-        mesh.apply_translation([0.0, 0.0, y])
-        meshes.append(mesh)
-    if not meshes:
+        if dem is None:
+            mesh = trimesh.creation.extrude_polygon(poly, height)
+            mesh.apply_translation([0.0, 0.0, y])
+            meshes.append(mesh)
+            continue
+        poly = shapely.orient_polygons(poly)  # exterior CCW, huecos CW: (dy, −dx) apunta siempre hacia fuera
+        verts, faces = [], []
+        for ring in [poly.exterior, *poly.interiors]:
+            pts = np.asarray(shapely.segmentize(ring, DRAPE_SEGMENT_M).coords)[:-1]
+            n = len(pts)
+            g = dem.sample_mesh(pts[:, 0], pts[:, 1])
+            base = sum(len(v) for v in verts)
+            verts.append(np.r_[np.c_[pts, g + y], np.c_[pts, g + y + height]])
+            k = np.arange(n)
+            b0, b1, t0, t1 = base + k, base + (k + 1) % n, base + n + k, base + n + (k + 1) % n
+            faces.append(np.r_[np.c_[b0, b1, t1], np.c_[b0, t1, t0]])
+        meshes.append(trimesh.Trimesh(np.vstack(verts), np.vstack(faces), process=False))
+    top = flat_mesh(split_by_terrain_triangles(polys), y + height, dem, segment=False) if dem is not None else None
+    if not meshes and top is None:
         return None
-    mesh = trimesh.util.concatenate(meshes)
-    mesh.apply_transform(LOCAL_TO_GLTF)
-    return mesh
+    mesh = trimesh.util.concatenate(meshes) if meshes else None
+    if mesh is not None:
+        mesh.apply_transform(LOCAL_TO_GLTF)
+    return trimesh.util.concatenate([m for m in (mesh, top) if m is not None])
 
 
 def polygons_of(geom) -> list[Polygon]:
@@ -286,13 +332,19 @@ def polygons_of(geom) -> list[Polygon]:
     return [g for part in getattr(geom, "geoms", []) for g in polygons_of(part)]
 
 
-def flat_mesh(polys: list[Polygon], y: float) -> trimesh.Trimesh | None:
+def flat_mesh(polys: list[Polygon], y: float, dem=None, segment: bool = True) -> trimesh.Trimesh | None:
+    """Superficie triangulada a la cota y; con `dem`, drapeada sobre el terreno (cota del MDT + y) tras densificar
+    los bordes cada DRAPE_SEGMENT_M para que los triángulos no puenteen el relieve (`segment=False` lo evita, p. ej.
+    en las celdas del borde del terreno, que deben compartir vértices con la cuadrícula)."""
     meshes = []
     for poly in polys:
         if poly.area < 0.01:
             continue
+        if dem is not None and segment:
+            poly = shapely.segmentize(poly, DRAPE_SEGMENT_M)
         v2, faces = trimesh.creation.triangulate_polygon(poly, engine="earcut")
-        v3 = np.c_[v2, np.full(len(v2), y)]  # local x, y, z=altura
+        z = y + (dem.sample_mesh(v2[:, 0], v2[:, 1]) if dem is not None else 0.0)
+        v3 = np.c_[v2, np.broadcast_to(z, (len(v2),))]  # local x, y, z=altura
         meshes.append(trimesh.Trimesh(v3, faces, process=False))
     if not meshes:
         return None
@@ -322,6 +374,7 @@ def main(argv=None):
     ap.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     ap.add_argument("--tile", type=float, default=TILE_M, help="Lado de tesela en metros")
     ap.add_argument("--no-measure", action="store_true", help="No medir con Catastro: anchura por clase")
+    ap.add_argument("--flat", action="store_true", help="Sin relieve (no usar dem_local.tif)")
     args = ap.parse_args(argv)
 
     origin = load_origin(args.meta)
@@ -345,8 +398,9 @@ def main(argv=None):
     else:
         print(f"[aviso] {args.buildings} no existe: no se recortan las huellas de edificio", file=sys.stderr)
     surfaces = build_surfaces(roads, municipality, footprints)
-    # La unión de superficies no cambia (el terreno se recorta igual); la calzada se divide en calzada + aceras
+    # La unión de superficies no cambia; la calzada se divide en calzada + aceras
     surfaces["carriageway"], surfaces["sidewalk"] = split_sidewalks(roads, surfaces["carriageway"])
+    dem = None if args.flat else LocalDEM.load()
     scene = trimesh.Scene()
     minx, miny, maxx, maxy = municipality.bounds
     i0, j0 = int(np.floor(minx / args.tile)), int(np.floor(miny / args.tile))
@@ -361,9 +415,11 @@ def main(argv=None):
                 tile = box(i * args.tile, j * args.tile, (i + 1) * args.tile, (j + 1) * args.tile)
                 piece = surf.intersection(tile)
                 if group == "sidewalk":
-                    mesh = curb_mesh(polygons_of(piece), ROAD_Y, CURB_HEIGHT_M)
+                    mesh = curb_mesh(polygons_of(piece), ROAD_Y, CURB_HEIGHT_M, dem)
                 else:
-                    mesh = flat_mesh(polygons_of(piece), ROAD_Y)
+                    polys = polygons_of(piece)
+                    mesh = (flat_mesh(split_by_terrain_triangles(polys), ROAD_Y, dem, segment=False)
+                            if dem is not None else flat_mesh(polys, ROAD_Y))
                 if mesh is None:
                     continue
                 mesh.visual = trimesh.visual.TextureVisuals(material=materials[group])

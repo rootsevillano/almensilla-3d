@@ -10,9 +10,12 @@ Salida: `data/export/almensilla_buildings.glb`
     cuya malla fusiona las extrusiones de sus BuildingPart.
   * Pretiles de azotea (0.9 m, salvo naves) en nodos decorativos `PARAPET_<i>_<j>` por tesela de 500 m
     (no colisionables, sin cara inferior), material `MAT_parapet`.
-  * Ejes glTF (Y arriba, dextrógiro): X = Este, Y = altura, Z = -Norte. Base en Y=0 (rasante).
+  * Ejes glTF (Y arriba, dextrógiro): X = Este, Y = altura, Z = -Norte. Asentados sobre el MDT (`dem.py`): cada
+    parte arranca 0.3 m bajo el punto más bajo del terreno en su contorno y su cubierta queda a la cota mediana
+    del terreno + `height_m`.
   * Un material PBR compartido por `currentUse`.
-  * extras de malla: localId, currentUse, nº de partes, altura máxima.
+  * extras de malla: localId, currentUse, nº de partes, altura máxima. Atributo de vértice `_floors`: plantas de
+    Catastro de la parte a la que pertenece cada vértice (para repartir las ventanas en el visor).
 
 Uso:
     python -P tools/gis/build_buildings_glb.py
@@ -32,6 +35,9 @@ import numpy as np
 import shapely
 import trimesh
 from shapely.geometry import MultiPolygon, Polygon
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from dem import LocalDEM  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_INPUT = ROOT / "data/processed/catastro_building_parts.geojson"
@@ -102,14 +108,27 @@ PARAPET_COLOR = (244, 242, 234, 255)
 TILE_M = 500.0  # mismas teselas que terreno, viales y árboles
 
 
-def parapets(group: gpd.GeoDataFrame) -> list[trimesh.Trimesh]:
-    """Pretiles de las partes de un edificio, en coordenadas locales (z = arriba).
+FOUNDATION_SINK_M = 0.3  # los muros arrancan bajo el punto más bajo del terreno: nada flota en ladera
+
+
+def part_levels(geom: Polygon, height: float, dem) -> tuple[float, float]:
+    """(arranque, cubierta) de una parte: arranca bajo el punto más bajo del terreno en su contorno y la cubierta
+    queda a la cota mediana del terreno + su altura (altura sobre el suelo, como el LiDAR y el Catastro)."""
+    if dem is None:
+        return 0.0, height
+    ring = np.asarray(shapely.segmentize(geom.exterior, 3.0).coords)
+    ground = dem.sample_mesh(np.r_[ring[:, 0], geom.centroid.x], np.r_[ring[:, 1], geom.centroid.y])
+    return float(ground.min()) - FOUNDATION_SINK_M, float(np.median(ground)) + height
+
+
+def parapets(group: gpd.GeoDataFrame, tops: list[float]) -> list[trimesh.Trimesh]:
+    """Pretiles de las partes de un edificio, en coordenadas locales (z = arriba), sobre la cota de su cubierta.
 
     El tramo de borde que linda con otra parte del mismo edificio igual o más alta se quita: ahí la cubierta
     continúa (o sube un muro), no hay pretil.
     """
     meshes = []
-    geoms, heights = list(group.geometry), list(group["height_m"])
+    geoms, heights = list(group.geometry), tops
     for i, (geom, h) in enumerate(zip(geoms, heights)):
         if geom.area < PARAPET_MIN_AREA_M2:
             continue
@@ -134,7 +153,9 @@ def main(argv=None):
     ap.add_argument("--zero-floor-height", type=float, default=0.0,
                     help="Altura para partes con 0 plantas sobre rasante; 0 = omitirlas (por defecto)")
     ap.add_argument("--no-parapets", action="store_true", help="No generar pretiles en las azoteas")
+    ap.add_argument("--flat", action="store_true", help="Sin relieve (no usar dem_local.tif)")
     args = ap.parse_args(argv)
+    dem = None if args.flat else LocalDEM.load()
 
     parts = gpd.read_file(args.input)
     required = {"localId", "buildingId", "currentUse", "height_m", "height_source"}
@@ -152,18 +173,29 @@ def main(argv=None):
     stats = Counter()
     parapets_by_tile: dict[tuple[int, int], list[trimesh.Trimesh]] = {}
     for building_id, group in parts.groupby("buildingId", sort=True):
-        meshes = [m for geom, h in zip(group.geometry, group["height_m"]) for m in extrude(geom, float(h))]
+        levels = [part_levels(geom, float(h), dem) for geom, h in zip(group.geometry, group["height_m"])]
+        meshes, floors = [], []
+        part_floors = [max(1, int(f)) if f == f and f is not None else 1
+                       for f in group["numberOfFloorsAboveGround"]]
+        for geom, (base, top), nf in zip(group.geometry, levels, part_floors):
+            for m in extrude(geom, top - base):
+                m.apply_translation([0.0, 0.0, base])
+                meshes.append(m)
+                floors.append(np.full(len(m.vertices), nf, dtype=np.float32))
         if not meshes:
             stats["empty_buildings"] += 1
             continue
         use = group["currentUse"].iloc[0]
         if not args.no_parapets and use not in NO_PARAPET_USES:
-            rails = parapets(group)
+            rails = parapets(group, [top for _, top in levels])
             if rails:
                 stats["parapet_pieces"] += len(rails)
                 c = group.geometry.union_all().centroid
                 parapets_by_tile.setdefault((int(c.x // TILE_M), int(c.y // TILE_M)), []).extend(rails)
         mesh = trimesh.util.concatenate(meshes)
+        # plantas de Catastro por vértice (concatenate apila los vértices en el mismo orden): el visor reparte las
+        # ventanas con altura de planta = altura del muro / plantas. Se exporta como atributo glTF `_floors`.
+        mesh.vertex_attributes["floors"] = np.concatenate(floors)
         mesh.apply_transform(LOCAL_TO_GLTF)
         mesh.visual = trimesh.visual.TextureVisuals(material=material_for(use, materials))
         mesh.metadata = {"localId": building_id, "currentUse": use, "parts": len(group),

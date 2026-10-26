@@ -1,0 +1,549 @@
+{
+  "_root": "C:\\Github\\almensilla-3d\\data\\raw\\ign",
+  "_license": "CC BY 4.0 scne.es (© Instituto Geográfico Nacional)",
+  "_dem_bbox_25830": [
+    220751.4,
+    4130931.2,
+    227436.5,
+    4135758.6
+  ],
+  "mdt05_25830.tif": {
+    "url": "https://servicios.idee.es/wcs-inspire/mdt?SERVICE=WCS&VERSION=2.0.1&REQUEST=GetCoverage&COVERAGEID=Elevacion25830_5&FORMAT=image%2Ftiff&SUBSET=x%28220751.4%2C227436.5%29&SUBSET=y%284130931.2%2C4135758.6%29",
+    "content_type": "image/tiff",
+    "bytes": 2583442,
+    "downloaded_utc": "2026-10-26T11:31:43+00:00"
+  },
+  "mdsn_e025_3042.tif": {
+    "url": "https://wcs-mds.idee.es/mds?SERVICE=WCS&VERSION=2.0.1&REQUEST=GetCoverage&COVERAGEID=mdsn_e025&FORMAT=image%2Ftiff&SUBSET=y%284130931.2%2C4135758.6%29&SUBSET=x%28220751.4%2C227436.5%29",
+    "content_type": "image/tiff",
+    "bytes": 10324470,
+    "downloaded_utc": "2026-10-26T11:31:50+00:00"
+  },
+  "mdsn_v025_3042.tif": {
+    "url": "https://wcs-mds.idee.es/mds?SERVICE=WCS&VERSION=2.0.1&REQUEST=GetCoverage&COVERAGEID=mdsn_v025&FORMAT=image%2Ftiff&SUBSET=y%284130931.2%2C4135758.6%29&SUBSET=x%28220751.4%2C227436.5%29",
+    "content_type": "image/tiff",
+    "bytes": 10324470,
+    "downloaded_utc": "2026-10-26T11:31:58+00:00"
+  },
+  "pnoa\\pnoa_-7_-4.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=752370.00%2C4130708.00%2C752870.00%2C4131208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 243602,
+    "downloaded_utc": "2026-10-26T11:34:12+00:00"
+  },
+  "pnoa\\pnoa_-6_-4.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=752870.00%2C4130708.00%2C753370.00%2C4131208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 285935,
+    "downloaded_utc": "2026-10-26T11:34:32+00:00"
+  },
+  "pnoa\\pnoa_-6_-3.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=752870.00%2C4131208.00%2C753370.00%2C4131708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 223520,
+    "downloaded_utc": "2026-10-26T11:34:51+00:00"
+  },
+  "pnoa\\pnoa_-6_-2.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=752870.00%2C4131708.00%2C753370.00%2C4132208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 156235,
+    "downloaded_utc": "2026-10-26T11:34:52+00:00"
+  },
+  "pnoa\\pnoa_-5_-4.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=753370.00%2C4130708.00%2C753870.00%2C4131208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 237457,
+    "downloaded_utc": "2026-10-26T11:34:54+00:00"
+  },
+  "pnoa\\pnoa_-5_-3.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=753370.00%2C4131208.00%2C753870.00%2C4131708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 264238,
+    "downloaded_utc": "2026-10-26T11:34:56+00:00"
+  },
+  "pnoa\\pnoa_-5_-2.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=753370.00%2C4131708.00%2C753870.00%2C4132208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 248838,
+    "downloaded_utc": "2026-10-26T11:34:59+00:00"
+  },
+  "pnoa\\pnoa_-5_0.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=753370.00%2C4132708.00%2C753870.00%2C4133208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 148977,
+    "downloaded_utc": "2026-10-26T11:35:16+00:00"
+  },
+  "pnoa\\pnoa_-5_2.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=753370.00%2C4133708.00%2C753870.00%2C4134208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 234484,
+    "downloaded_utc": "2026-10-26T11:35:34+00:00"
+  },
+  "pnoa\\pnoa_-4_-2.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=753870.00%2C4131708.00%2C754370.00%2C4132208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 262241,
+    "downloaded_utc": "2026-10-26T11:35:38+00:00"
+  },
+  "pnoa\\pnoa_-4_-1.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=753870.00%2C4132208.00%2C754370.00%2C4132708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 263030,
+    "downloaded_utc": "2026-10-26T11:35:55+00:00"
+  },
+  "pnoa\\pnoa_-4_0.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=753870.00%2C4132708.00%2C754370.00%2C4133208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 251856,
+    "downloaded_utc": "2026-10-26T11:35:56+00:00"
+  },
+  "pnoa\\pnoa_-4_1.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=753870.00%2C4133208.00%2C754370.00%2C4133708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 227772,
+    "downloaded_utc": "2026-10-26T11:36:18+00:00"
+  },
+  "pnoa\\pnoa_-4_2.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=753870.00%2C4133708.00%2C754370.00%2C4134208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 204360,
+    "downloaded_utc": "2026-10-26T11:36:19+00:00"
+  },
+  "pnoa\\pnoa_-4_3.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=753870.00%2C4134208.00%2C754370.00%2C4134708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 237491,
+    "downloaded_utc": "2026-10-26T11:36:27+00:00"
+  },
+  "pnoa\\pnoa_-3_-1.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=754370.00%2C4132208.00%2C754870.00%2C4132708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 215008,
+    "downloaded_utc": "2026-10-26T11:36:39+00:00"
+  },
+  "pnoa\\pnoa_-3_0.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=754370.00%2C4132708.00%2C754870.00%2C4133208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 223206,
+    "downloaded_utc": "2026-10-26T11:36:40+00:00"
+  },
+  "pnoa\\pnoa_-3_1.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=754370.00%2C4133208.00%2C754870.00%2C4133708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 188909,
+    "downloaded_utc": "2026-10-26T11:36:49+00:00"
+  },
+  "pnoa\\pnoa_-3_2.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=754370.00%2C4133708.00%2C754870.00%2C4134208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 246583,
+    "downloaded_utc": "2026-10-26T11:36:51+00:00"
+  },
+  "pnoa\\pnoa_-3_3.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=754370.00%2C4134208.00%2C754870.00%2C4134708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 203363,
+    "downloaded_utc": "2026-10-26T11:36:58+00:00"
+  },
+  "pnoa\\pnoa_-2_-2.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=754870.00%2C4131708.00%2C755370.00%2C4132208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 251751,
+    "downloaded_utc": "2026-10-26T11:37:04+00:00"
+  },
+  "pnoa\\pnoa_-2_-1.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=754870.00%2C4132208.00%2C755370.00%2C4132708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 246373,
+    "downloaded_utc": "2026-10-26T11:37:38+00:00"
+  },
+  "pnoa\\pnoa_-2_0.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=754870.00%2C4132708.00%2C755370.00%2C4133208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 261868,
+    "downloaded_utc": "2026-10-26T11:37:48+00:00"
+  },
+  "pnoa\\pnoa_-2_1.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=754870.00%2C4133208.00%2C755370.00%2C4133708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 221137,
+    "downloaded_utc": "2026-10-26T11:37:49+00:00"
+  },
+  "pnoa\\pnoa_-2_2.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=754870.00%2C4133708.00%2C755370.00%2C4134208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 187077,
+    "downloaded_utc": "2026-10-26T11:38:31+00:00"
+  },
+  "pnoa\\pnoa_-2_3.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=754870.00%2C4134208.00%2C755370.00%2C4134708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 179414,
+    "downloaded_utc": "2026-10-26T11:38:43+00:00"
+  },
+  "pnoa\\pnoa_-1_-3.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=755370.00%2C4131208.00%2C755870.00%2C4131708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 153648,
+    "downloaded_utc": "2026-10-26T11:39:13+00:00"
+  },
+  "pnoa\\pnoa_-1_-1.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=755370.00%2C4132208.00%2C755870.00%2C4132708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 247943,
+    "downloaded_utc": "2026-10-26T11:39:43+00:00"
+  },
+  "pnoa\\pnoa_-1_1.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=755370.00%2C4133208.00%2C755870.00%2C4133708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 239605,
+    "downloaded_utc": "2026-10-26T11:39:57+00:00"
+  },
+  "pnoa\\pnoa_-1_3.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=755370.00%2C4134208.00%2C755870.00%2C4134708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 209489,
+    "downloaded_utc": "2026-10-26T11:40:31+00:00"
+  },
+  "pnoa\\pnoa_-1_4.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=755370.00%2C4134708.00%2C755870.00%2C4135208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 252315,
+    "downloaded_utc": "2026-10-26T11:41:15+00:00"
+  },
+  "pnoa\\pnoa_0_-4.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=755870.00%2C4130708.00%2C756370.00%2C4131208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 180651,
+    "downloaded_utc": "2026-10-26T11:41:16+00:00"
+  },
+  "pnoa\\pnoa_0_-3.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=755870.00%2C4131208.00%2C756370.00%2C4131708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 203871,
+    "downloaded_utc": "2026-10-26T11:41:31+00:00"
+  },
+  "pnoa\\pnoa_0_-2.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=755870.00%2C4131708.00%2C756370.00%2C4132208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 236645,
+    "downloaded_utc": "2026-10-26T11:41:50+00:00"
+  },
+  "pnoa\\pnoa_0_0.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=755870.00%2C4132708.00%2C756370.00%2C4133208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 258159,
+    "downloaded_utc": "2026-10-26T11:42:23+00:00"
+  },
+  "pnoa\\pnoa_0_1.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=755870.00%2C4133208.00%2C756370.00%2C4133708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 250612,
+    "downloaded_utc": "2026-10-26T11:42:25+00:00"
+  },
+  "pnoa\\pnoa_0_2.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=755870.00%2C4133708.00%2C756370.00%2C4134208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 228343,
+    "downloaded_utc": "2026-10-26T11:42:39+00:00"
+  },
+  "pnoa\\pnoa_1_-4.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=756370.00%2C4130708.00%2C756870.00%2C4131208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 209321,
+    "downloaded_utc": "2026-10-26T11:42:57+00:00"
+  },
+  "pnoa\\pnoa_1_-3.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=756370.00%2C4131208.00%2C756870.00%2C4131708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 196991,
+    "downloaded_utc": "2026-10-26T11:43:00+00:00"
+  },
+  "pnoa\\pnoa_1_-2.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=756370.00%2C4131708.00%2C756870.00%2C4132208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 220995,
+    "downloaded_utc": "2026-10-26T11:43:02+00:00"
+  },
+  "pnoa\\pnoa_1_-1.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=756370.00%2C4132208.00%2C756870.00%2C4132708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 245120,
+    "downloaded_utc": "2026-10-26T11:43:08+00:00"
+  },
+  "pnoa\\pnoa_1_0.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=756370.00%2C4132708.00%2C756870.00%2C4133208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 250263,
+    "downloaded_utc": "2026-10-26T11:43:24+00:00"
+  },
+  "pnoa\\pnoa_1_1.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=756370.00%2C4133208.00%2C756870.00%2C4133708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 259921,
+    "downloaded_utc": "2026-10-26T11:43:25+00:00"
+  },
+  "pnoa\\pnoa_1_2.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=756370.00%2C4133708.00%2C756870.00%2C4134208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 223036,
+    "downloaded_utc": "2026-10-26T11:43:36+00:00"
+  },
+  "pnoa\\pnoa_2_-4.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=756870.00%2C4130708.00%2C757370.00%2C4131208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 121274,
+    "downloaded_utc": "2026-10-26T11:44:01+00:00"
+  },
+  "pnoa\\pnoa_2_-3.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=756870.00%2C4131208.00%2C757370.00%2C4131708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 154207,
+    "downloaded_utc": "2026-10-26T11:44:10+00:00"
+  },
+  "pnoa\\pnoa_2_-2.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=756870.00%2C4131708.00%2C757370.00%2C4132208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 196995,
+    "downloaded_utc": "2026-10-26T11:44:17+00:00"
+  },
+  "pnoa\\pnoa_2_-1.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=756870.00%2C4132208.00%2C757370.00%2C4132708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 226279,
+    "downloaded_utc": "2026-10-26T11:44:19+00:00"
+  },
+  "pnoa\\pnoa_2_1.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=756870.00%2C4133208.00%2C757370.00%2C4133708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 215236,
+    "downloaded_utc": "2026-10-26T11:44:36+00:00"
+  },
+  "pnoa\\pnoa_2_2.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=756870.00%2C4133708.00%2C757370.00%2C4134208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 217119,
+    "downloaded_utc": "2026-10-26T11:45:08+00:00"
+  },
+  "pnoa\\pnoa_2_3.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=756870.00%2C4134208.00%2C757370.00%2C4134708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 229246,
+    "downloaded_utc": "2026-10-26T11:45:12+00:00"
+  },
+  "pnoa\\pnoa_3_-5.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=757370.00%2C4130208.00%2C757870.00%2C4130708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 238940,
+    "downloaded_utc": "2026-10-26T11:45:23+00:00"
+  },
+  "pnoa\\pnoa_3_-4.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=757370.00%2C4130708.00%2C757870.00%2C4131208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 163220,
+    "downloaded_utc": "2026-10-26T11:45:24+00:00"
+  },
+  "pnoa\\pnoa_3_-2.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=757370.00%2C4131708.00%2C757870.00%2C4132208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 205170,
+    "downloaded_utc": "2026-10-26T11:45:42+00:00"
+  },
+  "pnoa\\pnoa_3_-1.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=757370.00%2C4132208.00%2C757870.00%2C4132708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 231214,
+    "downloaded_utc": "2026-10-26T11:45:58+00:00"
+  },
+  "pnoa\\pnoa_3_0.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=757370.00%2C4132708.00%2C757870.00%2C4133208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 275055,
+    "downloaded_utc": "2026-10-26T11:46:16+00:00"
+  },
+  "pnoa\\pnoa_3_1.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=757370.00%2C4133208.00%2C757870.00%2C4133708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 230518,
+    "downloaded_utc": "2026-10-26T11:46:36+00:00"
+  },
+  "pnoa\\pnoa_3_2.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=757370.00%2C4133708.00%2C757870.00%2C4134208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 207020,
+    "downloaded_utc": "2026-10-26T11:46:38+00:00"
+  },
+  "pnoa\\pnoa_3_3.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=757370.00%2C4134208.00%2C757870.00%2C4134708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 221639,
+    "downloaded_utc": "2026-10-26T11:46:39+00:00"
+  },
+  "pnoa\\pnoa_4_-3.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=757870.00%2C4131208.00%2C758370.00%2C4131708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 122711,
+    "downloaded_utc": "2026-10-26T11:47:23+00:00"
+  },
+  "pnoa\\pnoa_4_2.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=757870.00%2C4133708.00%2C758370.00%2C4134208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 226273,
+    "downloaded_utc": "2026-10-26T11:48:30+00:00"
+  },
+  "pnoa\\pnoa_5_-4.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=758370.00%2C4130708.00%2C758870.00%2C4131208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 182093,
+    "downloaded_utc": "2026-10-26T11:48:35+00:00"
+  },
+  "pnoa\\pnoa_5_-3.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=758370.00%2C4131208.00%2C758870.00%2C4131708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 160674,
+    "downloaded_utc": "2026-10-26T11:48:49+00:00"
+  },
+  "pnoa\\pnoa_5_-2.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=758370.00%2C4131708.00%2C758870.00%2C4132208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 226473,
+    "downloaded_utc": "2026-10-26T11:49:00+00:00"
+  },
+  "pnoa\\pnoa_5_-1.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=758370.00%2C4132208.00%2C758870.00%2C4132708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 179114,
+    "downloaded_utc": "2026-10-26T11:49:25+00:00"
+  },
+  "pnoa\\pnoa_6_-3.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=758870.00%2C4131208.00%2C759370.00%2C4131708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 224027,
+    "downloaded_utc": "2026-10-26T11:49:52+00:00"
+  },
+  "pnoa\\pnoa_6_-2.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=758870.00%2C4131708.00%2C759370.00%2C4132208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 189350,
+    "downloaded_utc": "2026-10-26T11:50:02+00:00"
+  },
+  "_ortho": {
+    "tiles": 85,
+    "tile_m": 500.0,
+    "px": 1000,
+    "crs": "EPSG:25829",
+    "origin_epsg25829": [
+      755870.0,
+      4132708.0
+    ],
+    "naming": "pnoa_<i>_<j>.jpg, tesela local i,j"
+  },
+  "pnoa\\pnoa_-5_1.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=753370.00%2C4133208.00%2C753870.00%2C4133708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 173813,
+    "downloaded_utc": "2026-10-26T11:50:45+00:00"
+  },
+  "pnoa\\pnoa_-2_4.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=754870.00%2C4134708.00%2C755370.00%2C4135208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 233906,
+    "downloaded_utc": "2026-10-26T11:50:47+00:00"
+  },
+  "pnoa\\pnoa_-1_0.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=755370.00%2C4132708.00%2C755870.00%2C4133208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 259123,
+    "downloaded_utc": "2026-10-26T11:51:19+00:00"
+  },
+  "pnoa\\pnoa_-1_2.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=755370.00%2C4133708.00%2C755870.00%2C4134208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 204011,
+    "downloaded_utc": "2026-10-26T11:51:35+00:00"
+  },
+  "pnoa\\pnoa_0_-1.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=755870.00%2C4132208.00%2C756370.00%2C4132708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 276303,
+    "downloaded_utc": "2026-10-26T11:51:53+00:00"
+  },
+  "pnoa\\pnoa_1_3.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=756370.00%2C4134208.00%2C756870.00%2C4134708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 221584,
+    "downloaded_utc": "2026-10-26T11:52:26+00:00"
+  },
+  "pnoa\\pnoa_2_0.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=756870.00%2C4132708.00%2C757370.00%2C4133208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 221533,
+    "downloaded_utc": "2026-10-26T11:52:34+00:00"
+  },
+  "pnoa\\pnoa_3_-3.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=757370.00%2C4131208.00%2C757870.00%2C4131708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 129472,
+    "downloaded_utc": "2026-10-26T11:52:51+00:00"
+  },
+  "pnoa\\pnoa_4_-5.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=757870.00%2C4130208.00%2C758370.00%2C4130708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 237443,
+    "downloaded_utc": "2026-10-26T11:52:53+00:00"
+  },
+  "pnoa\\pnoa_4_-4.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=757870.00%2C4130708.00%2C758370.00%2C4131208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 149580,
+    "downloaded_utc": "2026-10-26T11:53:08+00:00"
+  },
+  "pnoa\\pnoa_4_-2.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=757870.00%2C4131708.00%2C758370.00%2C4132208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 232662,
+    "downloaded_utc": "2026-10-26T11:53:09+00:00"
+  },
+  "pnoa\\pnoa_4_-1.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=757870.00%2C4132208.00%2C758370.00%2C4132708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 239546,
+    "downloaded_utc": "2026-10-26T11:53:23+00:00"
+  },
+  "pnoa\\pnoa_4_0.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=757870.00%2C4132708.00%2C758370.00%2C4133208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 230885,
+    "downloaded_utc": "2026-10-26T11:53:31+00:00"
+  },
+  "pnoa\\pnoa_5_0.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=758370.00%2C4132708.00%2C758870.00%2C4133208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 112534,
+    "downloaded_utc": "2026-10-26T11:53:56+00:00"
+  },
+  "pnoa\\pnoa_-5_-1.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=753370.00%2C4132208.00%2C753870.00%2C4132708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 164024,
+    "downloaded_utc": "2026-10-26T11:54:27+00:00"
+  },
+  "pnoa\\pnoa_-1_-2.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=755370.00%2C4131708.00%2C755870.00%2C4132208.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 210008,
+    "downloaded_utc": "2026-10-26T11:54:28+00:00"
+  },
+  "pnoa\\pnoa_0_3.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=755870.0%2C4134208.0%2C756370.0%2C4134708.0&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 226046,
+    "downloaded_utc": "2026-10-26T11:57:51+00:00"
+  },
+  "pnoa\\pnoa_4_1.jpg": {
+    "url": "https://www.ign.es/wms-inspire/pnoa-ma?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=&CRS=EPSG%3A25829&BBOX=757870.00%2C4133208.00%2C758370.00%2C4133708.00&WIDTH=1000&HEIGHT=1000&FORMAT=image%2Fjpeg",
+    "content_type": "image/jpeg",
+    "bytes": 214330,
+    "downloaded_utc": "2026-10-26T11:57:54+00:00"
+  }
+}

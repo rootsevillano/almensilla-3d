@@ -35,7 +35,10 @@ function waterMaterial(base) {
   });
 }
 
-/** Sustituye los materiales de aceras y piscinas por sus variantes con detalle. */
+/**
+ * Sustituye los materiales de aceras y piscinas por sus variantes con detalle. Viales y piscinas van encima del
+ * terreno continuo (unos cm, triangulados de otra forma): se les acerca en profundidad para que nunca parpadeen.
+ */
 export function applyGroundMaterials(...roots) {
   const cache = new Map();
   const variant = (mat) => {
@@ -43,6 +46,11 @@ export function applyGroundMaterials(...roots) {
     let out = mat;
     if (mat.name === 'MAT_road_sidewalk') out = sidewalkMaterial(mat);
     else if (mat.name === 'MAT_pool_water') out = waterMaterial(mat);
+    if (mat.name.startsWith('MAT_road_') || mat.name.startsWith('MAT_pool_')) {
+      out.polygonOffset = true;
+      out.polygonOffsetFactor = -2;
+      out.polygonOffsetUnits = -4;
+    }
     cache.set(mat, out);
     return out;
   };

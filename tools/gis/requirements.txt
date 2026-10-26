@@ -4,4 +4,5 @@ shapely==2.2.0
 pyproj==3.8.0
 trimesh==5.2.0
 mapbox-earcut==2.1.0
+rasterio==1.5.2
 numpy==2.4.4

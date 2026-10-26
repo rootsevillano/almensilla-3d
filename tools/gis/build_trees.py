@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
-"""Árboles desde OpenStreetMap a una lista de instancias para el visor.
+"""Árboles para el visor: copas reales del LiDAR (por defecto) o muestreo de áreas de OpenStreetMap.
 
-Basado en la inspección del fichero real (ver `.claude/MEMORY.md`, sección Fase 1):
+`--source lidar` (por defecto): una instancia por copa detectada en el MDS normalizado de vegetación del IGN
+(`lidar_trees.py`), con su posición y altura reales; el tipo sale del contexto (huerto OSM → olivo, bosque → pino,
+parque/jardín/casco → árbol de sombra, matorral bajo → arbusto; en el campo, olivo hasta 5 m) y la anchura de la
+alometría de la copa. Se descartan los que caen en edificios (+0.5 m), calzada, caminos o piscinas; los de acera
+se mantienen (alcorques).
+
+`--source osm` (fase 1), basado en la inspección del fichero OSM (ver `.claude/MEMORY.md`, sección Fase 1):
   * 11 nodos `natural=tree`                     -> árbol de sombra en su posición exacta.
   * 29 `leisure=park`, 10 `leisure=garden`        -> árboles de sombra repartidos (rejilla con jitter).
   * 19 `landuse=orchard` (9 con `trees=olive_trees`) -> olivos en hileras alineadas con la parcela (el
@@ -11,12 +17,14 @@ Basado en la inspección del fichero real (ver `.claude/MEMORY.md`, sección Fas
 Se descartan los puntos dentro de edificios (+1.5 m), viales (+1 m) o piscinas (+1 m), y fuera del término.
 
 Salida: `data/export/almensilla_trees.json`
-  {"types": [...], "axes": "X=East, Y=Up, Z=-North", "trees": [[x, z, tipo, escala], ...]}
-  en coordenadas glTF (Z = -Norte), mismo origen local que los GLB; los árboles apoyan en Y=0.
+  {"types": [...], "axes": "X=East, Y=Up, Z=-North", "trees": [[x, z, tipo, escala, y, ancho], ...]}
+  en coordenadas glTF (Z = -Norte), mismo origen local que los GLB; `y` es la cota del terreno (malla del MDT,
+  `dem.py`); `escala` es la vertical y `ancho` la horizontal respecto al modelo del visor (solo en `lidar`; con
+  `osm` la escala es uniforme y el registro tiene 5 campos).
 
 Uso:
     python -P tools/gis/build_trees.py
-    python -P tools/gis/build_trees.py --seed 7
+    python -P tools/gis/build_trees.py --source osm --seed 7
 """
 from __future__ import annotations
 
@@ -36,6 +44,7 @@ from shapely.geometry import MultiPolygon, Point, Polygon
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import build_roads_glb as roads_glb  # noqa: E402
+from dem import LocalDEM  # noqa: E402
 
 ROOT = roads_glb.ROOT
 DEFAULT_OSM = roads_glb.DEFAULT_OSM
@@ -141,13 +150,18 @@ def main(argv=None):
     ap.add_argument("--pools", type=Path, default=DEFAULT_POOLS)
     ap.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     ap.add_argument("--seed", type=int, default=41010, help="Semilla (salida reproducible)")
+    ap.add_argument("--source", choices=["lidar", "osm"], default="lidar",
+                    help="lidar: copas reales del MDSn de vegetación (por defecto); osm: muestreo de áreas OSM")
     args = ap.parse_args(argv)
+    if args.source == "lidar":
+        return main_lidar(args)
     for p in (args.lines, args.buildings, args.pools):
         if not p.exists():
             sys.exit(f"[ERROR] {p} no existe: ejecuta antes extract_catastro_buildings.py y build_roads_glb.py")
 
     rng = np.random.default_rng(args.seed)
     origin = roads_glb.load_origin(args.meta)
+    dem = LocalDEM.load()
     municipality, _, _ = roads_glb.load_cadastre(args.cp_zip, origin)
     footprints = gpd.read_file(args.buildings).union_all()
     roads = roads_glb.build_surfaces(gpd.read_file(args.lines), municipality, footprints)
@@ -177,13 +191,14 @@ def main(argv=None):
             dropped += 1
             continue
         lo, hi = SCALE_RANGE[kind]
-        # glTF: X = Este, Z = -Norte
-        trees.append([round(p.x, 2), round(-p.y, 2), TYPES.index(kind), round(float(rng.uniform(lo, hi)), 2)])
+        # glTF: X = Este, Z = -Norte; y = cota del terreno (MDT) en el pie del árbol
+        trees.append([round(p.x, 2), round(-p.y, 2), TYPES.index(kind), round(float(rng.uniform(lo, hi)), 2),
+                      round(float(dem.sample_mesh(p.x, p.y)), 2)])
         by_type[kind] += 1
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     payload = {"source": args.osm.name, "axes": "X=East, Y=Up, Z=-North", "units": "m",
-               "origin_epsg25829": list(origin), "types": TYPES, "fields": ["x", "z", "type", "scale"],
+               "origin_epsg25829": list(origin), "types": TYPES, "fields": ["x", "z", "type", "scale", "y"],
                "trees": trees}
     args.output.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
     print(json.dumps({
@@ -191,6 +206,80 @@ def main(argv=None):
         "osm_tree_nodes": len(points), "osm_areas": len(areas),
         "area_m2_by_rule": {k: round(v) for k, v in area_stats.items()},
         "candidates_dropped_blocked_or_outside": dropped,
+        "size_kb": round(args.output.stat().st_size / 1024, 1),
+    }, indent=2, ensure_ascii=False))
+
+
+# Dimensiones de los modelos del visor a escala 1 (app/src/trees.js, SHAPES.high): copa más alta y radio de copa
+MODEL_TOP_M = {"broadleaf": 5.13, "olive": 3.5, "pine": 7.22, "shrub": 1.15}
+MODEL_RADIUS_M = {"broadleaf": 1.7, "olive": 2.0, "pine": 2.9, "shrub": 0.9}
+RURAL_OLIVE_MAX_H = 5.0
+
+
+def main_lidar(args):
+    """Árboles reales: una instancia por copa detectada en el MDSn de vegetación (lidar_trees.py), con su posición
+    y altura; el tipo sale del contexto (áreas OSM, casco urbano) y la anchura de la alometría de la copa."""
+    from lidar_trees import detect_trees
+
+    for p in (args.lines, args.buildings, args.pools):
+        if not p.exists():
+            sys.exit(f"[ERROR] {p} no existe: ejecuta antes extract_catastro_buildings.py y build_roads_glb.py")
+    origin = roads_glb.load_origin(args.meta)
+    dem = LocalDEM.load()
+    municipality, urban, _ = roads_glb.load_cadastre(args.cp_zip, origin)
+    footprints = gpd.read_file(args.buildings).union_all()
+    roads = roads_glb.build_surfaces(gpd.read_file(args.lines), municipality, footprints)
+    pools = gpd.read_file(args.pools)
+    # Los árboles de acera se mantienen (alcorques); fuera los que caen en edificios, calzada, caminos o piscinas
+    blocked = shapely.union_all([
+        footprints.buffer(0.5),
+        shapely.union_all([roads[g] for g in ("carriageway", "track") if g in roads]),
+        shapely.union_all(list(pools.geometry)).buffer(0.5),
+    ])
+    allowed = municipality.difference(blocked)
+    shapely.prepare(allowed)
+
+    x, y, h, radius, det = detect_trees(origin, municipality.bounds)
+    keep = shapely.contains_xy(allowed, x, y)
+    x, y, h, radius = x[keep], y[keep], h[keep], radius[keep]
+
+    # Contexto: áreas OSM (huerto, bosque, parque, matorral) y casco urbano
+    _, areas = load_osm(args.osm, origin)
+    by_kind = {}
+    for key, geom in areas:
+        by_kind.setdefault(AREA_RULES[key][0], []).append(geom)
+    zone = {k: shapely.union_all(v) for k, v in by_kind.items()}
+    for g in zone.values():
+        shapely.prepare(g)
+    shapely.prepare(urban)
+    kind = np.where(h <= RURAL_OLIVE_MAX_H, "olive", "broadleaf").astype(object)
+    kind[shapely.contains_xy(urban, x, y)] = "broadleaf"
+    if "shrub" in zone:
+        m = shapely.contains_xy(zone["shrub"], x, y)
+        kind[m] = np.where(h[m] <= 3.0, "shrub", "olive")
+    for k in ("broadleaf", "olive", "pine"):  # parques/jardines, huertos y bosques mandan sobre lo anterior
+        if k in zone:
+            kind[shapely.contains_xy(zone[k], x, y)] = k
+
+    top = np.array([MODEL_TOP_M[k] for k in kind])
+    rad = np.array([MODEL_RADIUS_M[k] for k in kind])
+    scale_h = np.clip(h / top, 0.4, 6.0)
+    scale_w = np.clip(radius / rad, 0.5, 3.0)
+    ground = dem.sample_mesh(x, y)
+    trees = [[round(float(xi), 2), round(float(-yi), 2), TYPES.index(k), round(float(sh), 2),  # glTF Z = -Norte
+              round(float(g), 2), round(float(sw), 2)]
+             for xi, yi, k, sh, g, sw in zip(x, y, kind, scale_h, ground, scale_w)]
+
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    payload = {"source": "mdsn_v025 (IGN, CC BY 4.0 scne.es) + contexto OSM", "axes": "X=East, Y=Up, Z=-North",
+               "units": "m", "origin_epsg25829": list(origin), "types": TYPES,
+               "fields": ["x", "z", "type", "scale", "y", "width"], "trees": trees}
+    args.output.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
+    counts = Counter(kind)
+    print(json.dumps({
+        "output": args.output.name, "source": "lidar", "detected": det["peaks"], "kept": len(trees),
+        "dropped_blocked_or_outside": int((~keep).sum()), "by_type": {k: int(v) for k, v in counts.items()},
+        "height_m_p50_p95_max": [float(np.median(h)), float(np.percentile(h, 95)), float(h.max())],
         "size_kb": round(args.output.stat().st_size / 1024, 1),
     }, indent=2, ensure_ascii=False))
 

@@ -3,7 +3,7 @@ import * as THREE from 'three';
 /**
  * Colisión del personaje contra las mallas COL_ (contrato del agente 01).
  *
- * Los edificios son extrusiones verticales desde Y=0 y el personaje camina siempre por debajo de sus cubiertas,
+ * Los edificios son extrusiones verticales (desde un poco bajo el terreno) y el personaje camina siempre por debajo de sus cubiertas,
  * así que la colisión se resuelve en planta: se extraen de cada malla COL_ las aristas inferiores de sus caras
  * verticales (= contorno exacto de la huella, patios incluidos) y se guardan en una rejilla espacial.
  * El personaje es un círculo de radio r en XZ que se empuja fuera de los segmentos cercanos.
@@ -32,7 +32,9 @@ export class FootprintCollider {
       c.fromBufferAttribute(pos, at(i + 2)).applyMatrix4(mesh.matrixWorld);
       const n = ab.subVectors(b, a).cross(ac.subVectors(c, a));
       if (Math.abs(n.y) > 0.1 * n.length()) continue; // solo caras verticales (muros)
-      const ground = [a, b, c].filter((v) => v.y < 0.05);
+      // arista inferior del muro: con relieve los muros arrancan a la cota de su parte, no en Y=0
+      const minY = Math.min(a.y, b.y, c.y);
+      const ground = [a, b, c].filter((v) => v.y < minY + 0.01);
       if (ground.length === 2) this.#insert(ground[0].x, ground[0].z, ground[1].x, ground[1].z);
     }
   }
