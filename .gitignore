@@ -3,3 +3,7 @@ data/processed/*
 !data/processed/.gitkeep
 
 __pycache__/
+
+# Dependencias del visor
+node_modules/
+app/dist/
