@@ -8,17 +8,22 @@ import { applyGroundMaterials } from './ground.js';
 import { loadTrees } from './trees.js';
 import { LodManager } from './lod.js';
 import { OrthoGround } from './ortho.js';
+import { QualityManager } from './quality.js';
+import { runLevelBenchmark } from './benchLevels.js';
 import { Monigote } from './character/Monigote.js';
 import { FootprintCollider } from './character/collision.js';
 import { CharacterController } from './character/controller.js';
 
 // Parámetros de URL: ?merge=0 desactiva la fusión de edificios; ?shadows=0 desactiva las sombras;
-// ?lod=0 desactiva el nivel de detalle; ?ortho=0 terreno sin ortofoto; ?bench=20 órbita automática de 20 s.
+// ?lod=0 desactiva el nivel de detalle; ?ortho=0 terreno sin ortofoto; ?bench=20 órbita automática de 20 s;
+// ?quality=auto|high|medium|low (por defecto auto; en ?bench, high salvo que se indique, para poder comparar);
+// ?benchlevels mide el tiempo de GPU de los tres niveles a 1920×1080 (benchLevels.js).
 const params = new URLSearchParams(window.location.search);
 const MERGE = params.get('merge') !== '0';
 const SHADOWS = params.get('shadows') !== '0';
 const LOD = params.get('lod') !== '0';
 const ORTHO = params.get('ortho') !== '0';
+const QUALITY = params.get('quality') ?? (Number(params.get('bench')) ? 'high' : 'auto');
 const BENCH_S = Number(params.get('bench')) || 0;
 const BENCH_RADIUS_M = 900;
 const BENCH_HEIGHT_M = 420;
@@ -120,8 +125,12 @@ function setMode(next) {
 
 // Acceso para depuración y pruebas
 const gpu = new GpuTimer(renderer.getContext());
+const quality = new QualityManager({ renderer, scene, camera, shadows, lod, ortho, mode: QUALITY });
 window.__almensilla = {
-  scene, camera, controls, renderer, collisionMeshes, center, character, player, shadows, gpu, lod, ortho,
+  scene, camera, controls, renderer, collisionMeshes, center, character, player, shadows, gpu, lod, ortho, quality,
+  // el benchmark de niveles para el bucle para que sus fotogramas no se mezclen con los medidos
+  pauseLoop: () => renderer.setAnimationLoop(null),
+  resumeLoop: () => { last = performance.now(); renderer.setAnimationLoop(loop); },
 };
 
 const sceneInfo = () => {
@@ -136,7 +145,7 @@ if (bench) controls.enabled = false;
 let last = performance.now();
 let benchMeasuring = false;
 
-renderer.setAnimationLoop((now) => {
+function loop(now) {
   const dt = now - last;
   last = now;
 
@@ -151,7 +160,8 @@ renderer.setAnimationLoop((now) => {
     camera.lookAt(center);
     if (!bench.running) {
       const result = {
-        ...bench.result, ...gpu.summary(), merge: MERGE, shadows: SHADOWS, lod: LOD, ortho: ortho ? ortho.stats : false, ...sceneInfo(),
+        ...bench.result, ...gpu.summary(), quality: quality.level, merge: MERGE, shadows: SHADOWS, lod: LOD,
+        ortho: ortho ? ortho.stats : false, ...sceneInfo(),
         viewport: `${renderer.domElement.width}x${renderer.domElement.height}`,
         pixelRatio: renderer.getPixelRatio(), load_s: +(loadMs / 1000).toFixed(2),
       };
@@ -176,6 +186,7 @@ renderer.setAnimationLoop((now) => {
   gpu.begin();
   renderer.render(scene, camera);
   gpu.end();
+  quality.update(dt, gpu.samples.length ? gpu.samples[gpu.samples.length - 1] : null);
 
   if (meter.tick(dt)) {
     const info = sceneInfo();
@@ -189,8 +200,20 @@ renderer.setAnimationLoop((now) => {
     statsEl.textContent =
       `FPS     ${meter.fps.toFixed(0)}  (${meter.ms.toFixed(1)} ms)\n` +
       `GPU     ${gpu.available ? `${gpuMs} ms` : 'n/d'}\n` +
+      `calidad ${quality.label}\n` +
       `draws   ${info.calls}\n` +
       `tris    ${info.triangles.toLocaleString('es-ES')}\n` +
       benchLine;
   }
-});
+}
+renderer.setAnimationLoop(loop);
+
+// Al final: el benchmark para el bucle, así que este tiene que estar ya en marcha
+if (params.has('benchlevels')) {
+  statusEl.textContent = 'Midiendo los niveles de calidad… (unos 30 s)';
+  runLevelBenchmark(window.__almensilla).then((r) => {
+    const fmt = (m) => (m ? `${m.gpu_ms_p50} ms` : '—');
+    statusEl.textContent = 'benchlevels (GPU p50, órbita / a pie): ' + Object.entries(r.levels)
+      .map(([k, v]) => `${k} ${fmt(v.orbit)} / ${fmt(v.walk)}`).join(' · ');
+  });
+}

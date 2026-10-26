@@ -17,6 +17,7 @@ export class SunShadows {
     this.sun = sun;
     this.direction = sun.position.clone().normalize(); // hacia el sol
     sun.castShadow = true;
+    this.mapSize = MAP_SIZE;
     sun.shadow.mapSize.set(MAP_SIZE, MAP_SIZE);
     sun.shadow.bias = -0.0004;
     sun.shadow.normalBias = 0.03;
@@ -43,7 +44,7 @@ export class SunShadows {
       cam.right = cam.top = stepped;
       cam.updateProjectionMatrix();
     }
-    const texel = (2 * this.radius) / MAP_SIZE;
+    const texel = (2 * this.radius) / this.mapSize;
     const u = Math.round(focus.dot(this.right) / texel) * texel;
     const v = Math.round(focus.dot(this.up) / texel) * texel;
     const w = focus.dot(this.direction);
@@ -57,7 +58,21 @@ export class SunShadows {
   }
 
   get texelSizeM() {
-    return (2 * this.radius) / MAP_SIZE;
+    return (2 * this.radius) / this.mapSize;
+  }
+
+  /** Activa o desactiva la sombra del sol (cambia el nº de luces con sombra: Three.js recompila una vez). */
+  setEnabled(on) {
+    this.sun.castShadow = on;
+  }
+
+  /** Cambia el tamaño del mapa de sombras (lo libera para que se cree de nuevo con el tamaño nuevo). */
+  setMapSize(size) {
+    if (size === this.mapSize) return;
+    this.mapSize = size;
+    this.sun.shadow.mapSize.set(size, size);
+    this.sun.shadow.map?.dispose();
+    this.sun.shadow.map = null;
   }
 }
 

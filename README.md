@@ -28,6 +28,10 @@ para girar la cámara, rueda para el zoom y C para alternar con la vista aérea.
 
 Parámetros de URL: `?bench=20` (benchmark de 20 s), `?shadows=0`, `?lod=0`, `?ortho=0`, `?merge=0`.
 
+Calidad: `?quality=auto` (por defecto: empieza en alta y baja de nivel si los FPS caen), `high`, `medium` o `low`.
+Para medir un equipo, `?benchlevels` mide el tiempo de GPU de los tres niveles a 1920×1080 en unos 30 s y muestra el
+resultado en la barra de estado (y en `window.__benchLevels`).
+
 ## Regenerar los datos
 
 Un único script ejecuta todo el pipeline en orden (Catastro → alturas LiDAR → relieve → edificios → viales → terreno →

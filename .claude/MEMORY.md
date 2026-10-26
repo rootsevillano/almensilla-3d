@@ -610,6 +610,55 @@ condiciones", AccessConstraints **"CC BY 4.0 scne.es"** (atribución obligatoria
     quedan bajo el terreno.
 - `README.md` (antes vacío): requisitos, visor, regenerar datos, pruebas y atribución.
 
+### 2026-10-26 · Hardware de las medidas (agente 04)
+- Equipo de desarrollo: AMD Ryzen 7 5800H (8 núcleos/16 hilos), 15.3 GB RAM, pantalla 1920×1080 a 144 Hz, DPR 1.25,
+  dos GPU: **NVIDIA GeForce RTX 3050 Ti Laptop** (dedicada) y **AMD Radeon Graphics** (integrada Vega 8 del 5800H).
+- **El navegador del panel de Claude (Chrome 152 / ANGLE D3D11) renderiza con la integrada AMD**: WebGL informa
+  `ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11)`. Todas las medidas de FPS y tiempo de GPU de este
+  documento son, por tanto, de la iGPU Vega 8, no de la RTX.
+
+### 2026-10-26 · Equipo modesto: niveles de calidad, modo automático y estimación (agentes 02/04)
+- El usuario eligió **simular aquí** (no tiene otro equipo a mano). No es una medida en hardware modesto real.
+- **`app/src/quality.js` (`QualityManager`)**, `?quality=auto|high|medium|low` (por defecto `auto`; en `?bench`, `high`
+  salvo que se indique). Todo en caliente:
+
+  | Nivel | Resolución | Sombras | LOD | Sombra árboles | Ortofoto alta | Niebla / far |
+  |---|---|---|---|---|---|---|
+  | high | DPR (máx. 2) | 2048² | ×1 | sí | sí | 3600 / 8000 m |
+  | medium | 1 | no | ×0.6 | no | sí | 3000 / 4000 m |
+  | low | 0.75 | no | ×0.45 | no | no | 2400 / 2600 m |
+
+  (La primera versión de `medium`, con sombras de 1024², apenas mejoraba a `high` con DPR 1: se rehízo sin sombras.)
+  Modo auto: 3 s de calentamiento; baja un nivel si en una ventana de 3 s el p75 del fotograma supera 20 ms (<50 FPS)
+  o la mediana de GPU supera 15 ms; sube uno si lleva >15 s con p75 <14.3 ms y GPU <5 ms. Ignora fotogramas >250 ms y
+  la página oculta. Probado con tiempos sintéticos: fluido → se queda en alta; 30 FPS/GPU 22 ms → media a los 3 s y
+  baja a los 6 s; margen sostenido → vuelve a media y alta. El HUD muestra el nivel; `window.__almensilla.quality`.
+  Soporte añadido: `SunShadows.setEnabled/setMapSize`, `LodManager.distanceScale`, `OrthoGround.hiEnabled`.
+- **`app/src/benchLevels.js`, `?benchlevels`**: mide la GPU de los tres niveles en órbita (r=900 m) y a pie, 360
+  fotogramas cada uno, a lienzo fijo 1920×1080 con DPR 1 (baja: 1440×810), pausando el bucle del visor
+  (`pauseLoop/resumeLoop`) y bloqueando `setSize/setPixelRatio` durante la medida. Resultado en `window.__benchLevels`,
+  consola y barra de estado. **Pensado para ejecutarlo en un equipo modesto real** y comparar.
+  **Trampa:** el panel de Claude cambia de ancho y borra el viewport emulado a mitad de `?bench`; dos tandas salieron a
+  1114×630 y 835×472 (descartadas). `?benchlevels` no depende del tamaño de ventana.
+- **Medidas en esta iGPU (Vega 8), GPU p50 / p95, 1080p DPR 1:**
+
+  | Nivel | Órbita | A pie | CPU (envío) |
+  |---|---|---|---|
+  | high | 6.51 / 8.50 ms | 3.60 / 6.39 ms | ~1.0 ms |
+  | medium | 4.60 / 5.85 ms | 2.79 / 5.25 ms | ~0.8 ms |
+  | low | 2.99 / 3.73 ms | 1.93 / 3.33 ms | ~0.6 ms |
+
+- **Estimación para un portátil económico (Intel UHD 620)**, suponiendo que rinde 3–4 veces menos que la Vega 8
+  (relación aproximada entre clases de GPU, no medida) y escalado lineal del tiempo de GPU (×3.5 central):
+  high órbita ~22.8 ms p50 / 29.8 p95 (≈44 FPS) ✗; medium órbita ~16.1 / 20.5 (justo, p95 <60 FPS); **low órbita
+  ~10.5 / 13.1 ms (≈95 FPS, p95 ≈76 FPS) ✓** (a ×4: 12.0 / 14.9 ms ✓); a pie low ~6.8 / 11.7 ms ✓. CPU: el envío
+  (0.6–1.2 ms aquí) seguiría muy por debajo del presupuesto con una CPU 2–3 veces más lenta.
+  **Conclusión:** en GPU de clase Iris Xe / Vega 7–8 (portátiles actuales normales) el nivel alto cumple ≥60 FPS; en
+  clase UHD 620 solo el bajo lo garantiza, y el modo automático baja a él en ~6 s. Por debajo de UHD 620 (p. ej. HD 4000)
+  no está cubierto.
+- **Pendiente:** confirmar con `?benchlevels` en un equipo modesto real; valorar un nivel "muy bajo" (pixelRatio 0.5,
+  sin árboles lejanos) si hiciera falta.
+
 ### Pendiente / bloqueos
 - Git: todo subido (2026-10-26). PR #2 fusionó `gis/catastro-buildings-glb` en `main`; la fase 1 y el LOD están en
   `main` (commit `19be153`). El usuario sigue gestionando Git a mano.

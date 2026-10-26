@@ -63,6 +63,7 @@ export class OrthoGround {
     this.anisotropy = renderer.capabilities.getMaxAnisotropy();
     this.tiles = [];
     this.loading = 0;
+    this.hiEnabled = true; // nivel de calidad bajo: solo texturas de 256 px (quality.js)
     this.stats = { tiles: 0, hiLoaded: 0, hiLoading: 0 };
   }
 
@@ -100,11 +101,11 @@ export class OrthoGround {
     const wanted = [];
     for (const t of this.tiles) {
       const d = t.box.distanceToPoint(p);
-      if (t.hi && d > FAR_UNLOAD_M) {
+      if (t.hi && (d > FAR_UNLOAD_M || !this.hiEnabled)) {
         t.mesh.material.map = t.low;
         t.hi.dispose();
         t.hi = null;
-      } else if (!t.hi && !t.pending && d < NEAR_LOAD_M) {
+      } else if (this.hiEnabled && !t.hi && !t.pending && d < NEAR_LOAD_M) {
         wanted.push([d, t]);
       }
     }

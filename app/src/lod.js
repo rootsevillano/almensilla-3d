@@ -23,6 +23,7 @@ export class LodManager {
     this.parapets = parapets;
     this.trees = trees;
     this.treeShadows = treeShadows;
+    this.distanceScale = 1; // niveles de calidad: <1 acorta todas las distancias de LOD (quality.js)
     for (const m of parapets) {
       m.castShadow = false;
       m.receiveShadow = true;
@@ -32,17 +33,18 @@ export class LodManager {
 
   update(camera) {
     const s = { parapetsVisible: 0, treeTilesHigh: 0, treeTilesLow: 0, treeTilesShadow: 0 };
+    const k = this.distanceScale;
     for (const m of this.parapets) {
-      m.visible = distanceTo(m, camera) < PARAPET_HIDE_M;
+      m.visible = distanceTo(m, camera) < PARAPET_HIDE_M * k;
       s.parapetsVisible += m.visible;
     }
     for (const m of this.trees) {
       const d = distanceTo(m, camera);
-      m.visible = d < TREE_HIDE_M;
+      m.visible = d < TREE_HIDE_M * k;
       if (!m.visible) continue;
-      const high = d < TREE_LOW_M;
+      const high = d < TREE_LOW_M * k;
       m.geometry = high ? m.userData.lod.high : m.userData.lod.low;
-      m.castShadow = this.treeShadows && d < TREE_SHADOW_M;
+      m.castShadow = this.treeShadows && d < TREE_SHADOW_M * k;
       s.treeTilesHigh += high;
       s.treeTilesLow += !high;
       s.treeTilesShadow += m.castShadow;
