@@ -6,6 +6,7 @@ import * as THREE from 'three';
 //  - árboles: sombra solo cerca (la del olivo ya no se distingue a más de ~200 m), copa simple a partir de 350 m
 //    y ocultos a partir de 2200 m (la niebla, 700–3600 m, ya los ha fundido con el suelo).
 const PARAPET_HIDE_M = 700;
+const DOOR_HIDE_M = 250; // puerta de 1×2 m: ~2 px a esa distancia
 const TREE_SHADOW_M = 220;
 const TREE_LOW_M = 350;
 const TREE_HIDE_M = 2200;
@@ -19,24 +20,29 @@ function distanceTo(mesh, camera) {
 }
 
 export class LodManager {
-  constructor({ parapets = [], trees = [], treeShadows = true }) {
+  constructor({ parapets = [], doors = [], trees = [], treeShadows = true }) {
     this.parapets = parapets;
+    this.doors = doors;
     this.trees = trees;
     this.treeShadows = treeShadows;
     this.distanceScale = 1; // niveles de calidad: <1 acorta todas las distancias de LOD (quality.js)
-    for (const m of parapets) {
+    for (const m of [...parapets, ...doors]) {
       m.castShadow = false;
       m.receiveShadow = true;
     }
-    this.stats = { parapetsVisible: 0, treeTilesHigh: 0, treeTilesLow: 0, treeTilesShadow: 0 };
+    this.stats = { parapetsVisible: 0, doorsVisible: 0, treeTilesHigh: 0, treeTilesLow: 0, treeTilesShadow: 0 };
   }
 
   update(camera) {
-    const s = { parapetsVisible: 0, treeTilesHigh: 0, treeTilesLow: 0, treeTilesShadow: 0 };
+    const s = { parapetsVisible: 0, doorsVisible: 0, treeTilesHigh: 0, treeTilesLow: 0, treeTilesShadow: 0 };
     const k = this.distanceScale;
     for (const m of this.parapets) {
       m.visible = distanceTo(m, camera) < PARAPET_HIDE_M * k;
       s.parapetsVisible += m.visible;
+    }
+    for (const m of this.doors) {
+      m.visible = distanceTo(m, camera) < DOOR_HIDE_M * k;
+      s.doorsVisible += m.visible;
     }
     for (const m of this.trees) {
       const d = distanceTo(m, camera);

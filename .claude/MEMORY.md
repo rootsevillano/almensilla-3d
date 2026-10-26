@@ -659,19 +659,54 @@ condiciones", AccessConstraints **"CC BY 4.0 scne.es"** (atribución obligatoria
 - **Pendiente:** confirmar con `?benchlevels` en un equipo modesto real; valorar un nivel "muy bajo" (pixelRatio 0.5,
   sin árboles lejanos) si hiciera falta.
 
+### 2026-10-26 · Fase 3 de realismo (tejados, puertas, pasos de cebra, personaje)
+- **Tipo de cubierta** (`tools/gis/classify_roofs.py`, paso `roofs` del pipeline entre `lidar` y `dem`): rojez media
+  (R − B)/(R + G + B) de la ortofoto de 0.5 m en la huella erosionada 1 m (≥8 píxeles). **Hallazgo:** los mosaicos de
+  validación muestran que Almensilla tiene muchos chalés con **tejado de teja a cuatro aguas** (la suposición de la
+  fase 1, "todo azoteas con pretil", era errónea en las urbanizaciones). Umbral elegido viendo mosaicos por bandas:
+  ≥0.065 → teja (por debajo dominan azoteas, cubiertas claras o grises y placas solares; 0.04–0.06 es mixto).
+  Resultado: 7550 partes de teja y 3024 azoteas (6837 medidas; 3737 heredan el tipo mayoritario de su edificio).
+  Columnas `roof_redness`, `roof_type` en `catastro_building_parts.geojson` (idempotente).
+- **Tejados a cuatro aguas** (`build_buildings_glb.py`): partes de teja con área ≥20 m², rectangularidad (área / área
+  del rectángulo mínimo) ≥0.85 y lado corto de 4–20 m. Pendiente 30 %, subida ≤3 m, alero volado 0.3 m con cara
+  inferior; alero a `cota − 0.4·subida` (la mediana LiDAR de un tejado inclinado cae a media pendiente); los muros llegan
+  al alero. Nodos `ROOF_<i>_<j>`, material `MAT_roof_tile`. 1626 tejados. Las demás partes de teja: cubierta plana pintada
+  de teja (atributo de vértice `_roof` = 1; `facadeTop` del shader pasa a vec3). Sin pretil en las partes de teja
+  (pretiles: 8750 → 2389 piezas). Edificios: 472 k → 330 k triángulos, 8.04 MB.
+- **Puertas** (`DOOR_<i>_<j>`, `MAT_door`): **hallazgo:** los 3131 portales de AD (Address, specification=Entrance)
+  están en la entrada de la **parcela**, no en la fachada (mediana 4.2 m del contorno; 43 % a >5 m; casi ninguno dentro de
+  una huella). Regla: el portal se enlaza con su edificio por la referencia catastral (último campo del localId de AD =
+  localId de Building) y la puerta (1 × 2.15 × 0.06 m, madera) va en la fachada exterior de ese edificio más cercana al
+  portal, descartando medianeras (al otro lado hay otro edificio) y lados <1.6 m; una por portal (dedup a 2 m).
+  2714 puertas; 412 portales sin edificio con volumen (solares), 4 duplicados, 1 sin fachada libre.
+- **Pasos de cebra** (`build_roads_glb.py`, `ROAD_marking_<i>_<j>`, `MAT_road_marking`): franjas de 0.5 m (hueco 0.5 m,
+  3 m a lo largo de la calle) a lo ancho de la calzada (anchura − 2·acera − 0.3 m de margen), recortadas a la calzada y
+  drapeadas 1 cm sobre ella; en el visor, polygonOffset (−4, −8). **Hallazgo:** de los 103 nodos de cruce del OSM, **97
+  están en municipios vecinos** (Mairena del Aljarafe, dentro del recuadro descargado): solo 6 pasos de cebra en el
+  término. Los cruces de Almensilla están poco cartografiados en OSM (opción futura: deducirlos en intersecciones, pero
+  sería dato inventado).
+- **Visor:** `mergeBuildings` devuelve `parapets`, `roofs` y `doors`; tejado con hiladas horizontales cada 0.1 m de altura
+  en el shader (se funden a distancia); puertas sin sombra y ocultas a >250 m (LodManager); tejados con sombra y siempre
+  visibles. **Trampa de depuración:** `enableShadows` convierte a no indexadas las mallas sin normales: cada puerta tiene
+  36 vértices en el visor (8 en el GLB).
+- **Personaje:** `FootprintCollider.addCircles` con los troncos (radio de la base del tronco del modelo × escala
+  horizontal; arbustos sin tronco), rejilla aparte de círculos: 72 394 troncos. Probado: se detiene a 0.448 m del centro
+  de un tronco de 0.13 m (= 0.13 + 0.32). Transparencia: opacidad = clamp((d − 0.6)/(1.6 − 0.6), 0.25, 1) con d =
+  distancia cámara–ojos (`Monigote.setOpacity`); probado contra un muro: cámara a 0.6 m → opacidad 0.25.
+- **Pruebas:** 34 (nuevas: atributo `_roof`, faldones orientados, puertas pegadas a la fachada y fuera de la huella,
+  pasos de cebra sobre la calzada; nombres `ROOF_`, `DOOR_`, `ROAD_marking`). Pipeline completo con sync y pruebas: 99.5 s.
+- **`?benchlevels`** tras la fase 3 (GPU p50/p95): high órbita 6.76/8.75, a pie 3.76/6.83; medium 4.54/5.70 y 2.59/5.04;
+  low 3.09/3.90 y 2.03/3.54 ms → coste prácticamente nulo (los tejados se compensan con los pretiles que desaparecen).
+- **Pendiente de la fase 3:** edificios singulares (iglesia, ayuntamiento, plaza) **necesitan referencias del usuario**
+  (fotos o descripción) para no inventar; tejados a dos aguas / forma real en partes no rectangulares; controles táctiles.
+
 ### Pendiente / bloqueos
-- Git: todo subido (2026-10-26). PR #2 fusionó `gis/catastro-buildings-glb` en `main`; la fase 1 y el LOD están en
-  `main` (commit `19be153`). El usuario sigue gestionando Git a mano.
-- Fase 1, cosas que faltan: puertas (se podrían colocar en las 3131 entradas de portal de AD), pasos de cebra
-  (93 nodos `crossing`), árboles de alineación en aceras (no están en OSM), colisión con árboles, el personaje
-  "flota" sobre el agua de las piscinas, tejados de teja.
+- Git: el usuario gestiona Git a mano. Último commit visto: «Fase 2» (`1a28562`); desde entonces hay cambios sin commitear.
 - Sombras: fuera del radio del mapa (≤512 m del foco) no hay sombra; en vista aérea muy lejana se nota el corte
   (lo suaviza la niebla). Si hiciera falta: cascadas (CSM) o desvanecer la sombra en el borde del mapa.
-- Personaje: la cámara muy cerca (contra un muro) queda dentro de la cabeza; se podría atenuar el monigote cuando la
-  cámara está a menos de ~1 m. Huecos entre edificios más estrechos que 0.64 m no son transitables (es lo deseado).
-- Controles solo de teclado y ratón (sin táctil ni mando).
+- Personaje: huecos entre edificios más estrechos que 0.64 m no son transitables (es lo deseado); el personaje camina
+  sobre el agua de las piscinas; controles solo de teclado y ratón.
 - Decidir qué hacer con las 184 partes de 0 plantas: provisionalmente se omiten en el GLB de edificios.
-- Relieve: el terreno es plano. Para cota real haría falta el MDT05 del CNIG/IGN (lo descarga el usuario); entonces
-  habrá que asentar edificios y viales sobre el MDT y resolver los puentes (`bridge=*`, `layer`).
-- Fuera del término municipal no hay suelo: de momento lo tapa la niebla (700–3600 m); con zoom lejano se ve el borde.
+- Puentes (`bridge=*`, `layer`): aplanados sobre el terreno.
+- Fuera del término municipal no hay suelo: lo tapa la niebla; con zoom muy lejano se ve el borde.
 - trimesh no tiene `networkx` (algunas utilidades de `trimesh.repair` fallan); no hace falta para la extrusión.

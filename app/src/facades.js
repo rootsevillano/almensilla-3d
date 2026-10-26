@@ -29,8 +29,9 @@ const VARIANTS = {
 function addFacadeAttribute(geometry) {
   const pos = geometry.attributes.position;
   const floorsAttr = geometry.attributes._floors;
+  const roofAttr = geometry.attributes._roof; // 1 = cubierta de teja (classify_roofs.py)
   const out = new Float32Array(pos.count * 4);
-  const tops = new Float32Array(pos.count * 2);
+  const tops = new Float32Array(pos.count * 3);
   const a = new THREE.Vector3();
   const b = new THREE.Vector3();
   const c = new THREE.Vector3();
@@ -65,26 +66,27 @@ function addFacadeAttribute(geometry) {
     const floors = floorsAttr ? Math.max(1, floorsAttr.getX(i)) : Math.max(1, Math.round(top / LEGACY_FLOOR_H));
     for (let k = 0; k < 3; k++) {
       out.set([u[k], wallLen, kind, ground], (i + k) * 4);
-      tops.set([top, floors], (i + k) * 2);
+      tops.set([top, floors, roofAttr ? roofAttr.getX(i) : 0], (i + k) * 3);
     }
   }
   geometry.setAttribute('facade', new THREE.BufferAttribute(out, 4));
-  geometry.setAttribute('facadeTop', new THREE.BufferAttribute(tops, 2));
+  geometry.setAttribute('facadeTop', new THREE.BufferAttribute(tops, 3));
 }
 
 const VERTEX_HEAD = /* glsl */ `
 attribute vec4 facade;
-attribute vec2 facadeTop;
+attribute vec3 facadeTop;
 varying vec4 vFacade;
-varying vec2 vTop;
+varying vec3 vTop;
 varying float vWorldY;
 `;
 
 const FRAGMENT_HEAD = /* glsl */ `
 varying vec4 vFacade;
-varying vec2 vTop;
+varying vec3 vTop;
 varying float vWorldY;
 uniform vec3 uWall;
+uniform vec3 uTile;
 uniform vec3 uSocle;
 uniform vec3 uRoof;
 uniform vec3 uGlass;
@@ -96,7 +98,7 @@ const FRAGMENT_BODY = /* glsl */ `
   float kind = vFacade.z;
   vec3 col = uWall;
   if (kind > 0.5 && kind < 1.5) {
-    col = uRoof;
+    col = vTop.z > 0.5 ? uTile : uRoof;   // cubierta plana de teja (partes sin tejado a cuatro aguas)
   } else if (kind < 0.5) {
     float u = vFacade.x;
     float wallLen = vFacade.y;
@@ -147,6 +149,7 @@ function facadeMaterial(base, variant) {
     uWall: { value: new THREE.Color(shed ? 0xc9c8c2 : 0xf4f2ea) },
     uSocle: { value: new THREE.Color(shed ? 0x9a9a94 : 0xe0c27f) }, // zócalo albero
     uRoof: { value: new THREE.Color(shed ? 0x9ea3a6 : 0xd8cfbf) },
+    uTile: { value: new THREE.Color(0xb26042) },
     uGlass: { value: new THREE.Color(0x2f3a44) },
     uFrame: { value: new THREE.Color(0xe9e6dc) },
   };
@@ -166,14 +169,40 @@ function facadeMaterial(base, variant) {
   return mat;
 }
 
+/** Teja árabe: hiladas horizontales (en un tejado del 30 % suben ~0.1 m por hilada) y variación de tono por teja. */
+function tileRoofMaterial() {
+  const mat = new THREE.MeshStandardMaterial({ name: 'MAT_roof_tile', color: 0xb8664a, roughness: 0.85, flatShading: true });
+  mat.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vRoofWorld;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRoofWorld = (modelMatrix * vec4(position, 1.0)).xyz;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vRoofWorld;')
+      .replace('#include <color_fragment>', /* glsl */ `#include <color_fragment>
+      {
+        float course = fract(vRoofWorld.y / 0.1);
+        float far = smoothstep(0.03, 0.12, fwidth(vRoofWorld.y));   // a distancia: tono medio, sin muaré
+        float shade = mix(0.82 + 0.18 * smoothstep(0.0, 0.35, course), 0.93, far);
+        float n = fract(sin(dot(floor(vRoofWorld.xz / 0.4), vec2(12.9898, 78.233))) * 43758.5453);
+        diffuseColor.rgb *= shade * mix(0.92 + 0.16 * n, 1.0, far);
+      }`);
+  };
+  mat.customProgramCacheKey = () => 'roof-tile';
+  return mat;
+}
+
 /** Prepara las mallas de edificios (no indexadas, normales planas, atributo facade) y les asigna el shader. */
 export function applyFacades(root) {
   const cache = new Map();
-  const parapet = new THREE.MeshStandardMaterial({ name: 'MAT_parapet', color: 0xf4f2ea, roughness: 0.9, flatShading: true });
+  const special = {
+    MAT_parapet: new THREE.MeshStandardMaterial({ name: 'MAT_parapet', color: 0xf4f2ea, roughness: 0.9, flatShading: true }),
+    MAT_roof_tile: tileRoofMaterial(),
+    MAT_door: new THREE.MeshStandardMaterial({ name: 'MAT_door', color: 0x5c3c26, roughness: 0.7, flatShading: true }),
+  };
   root.traverse((mesh) => {
     if (!mesh.isMesh) return;
-    if (mesh.material.name === 'MAT_parapet') {
-      mesh.material = parapet; // pretil: cal lisa, sin ventanas
+    if (special[mesh.material.name]) {
+      mesh.material = special[mesh.material.name]; // pretil (cal lisa), tejado de teja, puerta de madera
       return;
     }
     if (mesh.geometry.index) mesh.geometry = mesh.geometry.toNonIndexed();

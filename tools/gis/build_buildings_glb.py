@@ -42,6 +42,7 @@ from dem import LocalDEM  # noqa: E402
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_INPUT = ROOT / "data/processed/catastro_building_parts.geojson"
 DEFAULT_OUTPUT = ROOT / "data/export/almensilla_buildings.glb"
+DEFAULT_META = ROOT / "data/processed/catastro_buildings.meta.json"
 COLLISION_PREFIX = "COL_"
 
 # Local (x=E, y=N, z=arriba) -> glTF (X=E, Y=arriba, Z=-N). Rotación de -90° sobre X.
@@ -121,16 +122,142 @@ def part_levels(geom: Polygon, height: float, dem) -> tuple[float, float]:
     return float(ground.min()) - FOUNDATION_SINK_M, float(np.median(ground)) + height
 
 
-def parapets(group: gpd.GeoDataFrame, tops: list[float]) -> list[trimesh.Trimesh]:
+# Tejado de teja a cuatro aguas (chalés de las urbanizaciones; tipo de cubierta en classify_roofs.py)
+ROOF_PREFIX = "ROOF_"
+ROOF_COLOR = (178, 96, 66, 255)  # teja árabe envejecida
+ROOF_SLOPE = 0.30  # 30 % (~17°)
+ROOF_MAX_RISE_M = 3.0
+ROOF_OVERHANG_M = 0.30
+HIP_MIN_AREA_M2 = 20.0
+HIP_MIN_RECTANGULARITY = 0.85  # área / área del rectángulo mínimo
+HIP_SHORT_SIDE_M = (4.0, 20.0)
+HIP_EAVE_FACTOR = 0.4  # la altura LiDAR (mediana) de un tejado inclinado cae a ~40 % de la subida sobre el alero
+
+
+def hip_frame(geom: Polygon):
+    """(esquinas CCW del rectángulo mínimo con el lado largo primero, lado corto W, lado largo L) o None si la parte
+    no es casi rectangular o su tamaño no encaja con un tejado a cuatro aguas."""
+    if geom.area < HIP_MIN_AREA_M2:
+        return None
+    rect = shapely.orient_polygons(geom.minimum_rotated_rectangle)
+    if geom.area / rect.area < HIP_MIN_RECTANGULARITY:
+        return None
+    c = np.asarray(rect.exterior.coords)[:4]
+    sides = np.linalg.norm(np.roll(c, -1, axis=0) - c, axis=1)
+    if sides[0] < sides[1]:  # que c0→c1 sea un lado largo
+        c = np.roll(c, -1, axis=0)
+        sides = np.roll(sides, -1)
+    long_, short = float(sides[0]), float(sides[1])
+    if not (HIP_SHORT_SIDE_M[0] <= short <= HIP_SHORT_SIDE_M[1]):
+        return None
+    return c, short, long_
+
+
+def hip_roof(corners: np.ndarray, short: float, long_: float, eave: float, rise: float) -> trimesh.Trimesh:
+    """Tejado a cuatro aguas sobre el rectángulo (z = arriba): cumbrera a lo largo del lado largo, alero volado."""
+    center = corners.mean(axis=0)
+    u = (corners[1] - corners[0]) / long_  # eje largo
+    v = (corners[3] - corners[0]) / short  # eje corto
+    hl, hs = long_ / 2 + ROOF_OVERHANG_M, short / 2 + ROOF_OVERHANG_M
+    drop = ROOF_OVERHANG_M * ROOF_SLOPE  # el alero volado baja con la pendiente
+    eaves = [center + a * hl * u + b * hs * v for a, b in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+    ridge_half = max(0.0, long_ / 2 - short / 2)  # cuadrado: pirámide (cumbrera de longitud 0)
+    r0, r1 = center - ridge_half * u, center + ridge_half * u
+    vz = [eave - drop] * 4 + [eave + rise] * 2
+    verts = np.c_[np.vstack(eaves + [r0, r1]), vz]
+    faces = np.array([[0, 1, 5], [0, 5, 4],  # faldón largo (lado c0-c1)
+                      [2, 3, 4], [2, 4, 5],  # faldón largo opuesto
+                      [1, 2, 5],             # faldón corto
+                      [3, 0, 4],             # faldón corto opuesto
+                      [0, 3, 2], [0, 2, 1]])  # cara inferior del alero (hacia abajo)
+    mesh = trimesh.Trimesh(verts, faces, process=False)
+    # orientación: faldones hacia arriba, cara inferior hacia abajo
+    n = mesh.face_normals
+    flip = np.r_[n[:6, 2] < 0, n[6:, 2] > 0]
+    mesh.faces[flip] = mesh.faces[flip][:, ::-1]
+    return mesh
+
+
+# Puertas en los portales del fichero de direcciones del Catastro (AD)
+DEFAULT_AD_ZIP = ROOT / "data/raw/catastro/A.ES.SDGC.AD.41010.zip"
+DEFAULT_BUILDINGS = ROOT / "data/processed/catastro_buildings.geojson"
+DOOR_PREFIX = "DOOR_"
+DOOR_COLOR = (92, 60, 38, 255)  # madera
+DOOR_W, DOOR_H, DOOR_T = 1.0, 2.15, 0.06
+DOOR_MIN_WALL_M = 1.6
+
+
+def load_entrances(ad_zip: Path, origin) -> gpd.GeoDataFrame:
+    """Portales (Address con specification=Entrance) en coordenadas locales con la referencia catastral del edificio.
+    Inspección: el punto marca la entrada a la parcela (mediana a 4.2 m de la fachada), no la puerta del edificio."""
+    ad = gpd.read_file(f"/vsizip/{ad_zip.as_posix()}/{ad_zip.stem}.gml", layer="Address")
+    ad = ad[ad["specification"] == "Entrance"]
+    x = ad.geometry.x.to_numpy() - origin[0]
+    y = ad.geometry.y.to_numpy() - origin[1]
+    refcat = ad["localId"].str.split(".").str[-1]  # 41.010.<vía>.<número>.<refcat14>
+    return gpd.GeoDataFrame({"refcat": refcat.to_numpy()}, geometry=shapely.points(x, y))
+
+
+def door_meshes(entrances, footprints: gpd.GeoDataFrame, dem) -> tuple[dict, Counter]:
+    """Una puerta por portal en la fachada exterior del edificio más cercana al portal (descartando medianeras)."""
+    by_ref = {r: g for r, g in zip(footprints["localId"], footprints.geometry)}
+    tree = shapely.STRtree(footprints.geometry.values)
+    doors_by_tile: dict[tuple[int, int], list[trimesh.Trimesh]] = {}
+    placed: dict[str, list[np.ndarray]] = {}
+    stats = Counter()
+    for ref, pt in zip(entrances["refcat"], entrances.geometry):
+        geom = by_ref.get(ref)
+        if geom is None:
+            stats["no_building"] += 1
+            continue
+        best = None
+        for poly in getattr(geom, "geoms", [geom]):
+            ring = np.asarray(shapely.orient_polygons(poly).exterior.coords)
+            for a, b in zip(ring[:-1], ring[1:]):
+                seg = b - a
+                length = float(np.hypot(*seg))
+                if length < DOOR_MIN_WALL_M:
+                    continue
+                d = seg / length
+                normal = np.array([d[1], -d[0]])  # exterior CCW: hacia fuera
+                t = float(np.clip(np.dot(np.array([pt.x, pt.y]) - a, d), 0.8, length - 0.8))
+                center = a + d * t
+                probe = shapely.Point(*(center + normal * 0.6))
+                if len(tree.query(probe, predicate="within")):  # al otro lado hay otro edificio: medianera
+                    continue
+                dist = float(np.hypot(pt.x - center[0], pt.y - center[1]))
+                if best is None or dist < best[0]:
+                    best = (dist, center, d, normal)
+        if best is None:
+            stats["no_free_wall"] += 1
+            continue
+        _, center, d, normal = best
+        if any(np.hypot(*(center - c)) < 2.0 for c in placed.get(ref, [])):
+            stats["duplicate"] += 1
+            continue
+        placed.setdefault(ref, []).append(center)
+        ground = float(dem.sample_mesh(center[0], center[1])) if dem is not None else 0.0
+        box = trimesh.creation.box(extents=[DOOR_W, DOOR_T, DOOR_H])
+        frame = np.eye(4)
+        frame[:3, 0] = [d[0], d[1], 0.0]
+        frame[:3, 1] = [normal[0], normal[1], 0.0]
+        frame[:3, 3] = [center[0] + normal[0] * 0.01, center[1] + normal[1] * 0.01, ground + DOOR_H / 2]
+        box.apply_transform(frame)
+        doors_by_tile.setdefault((int(center[0] // TILE_M), int(center[1] // TILE_M)), []).append(box)
+        stats["doors"] += 1
+    return doors_by_tile, stats
+
+
+def parapets(group: gpd.GeoDataFrame, tops: list[float], skip: list[bool] | None = None) -> list[trimesh.Trimesh]:
     """Pretiles de las partes de un edificio, en coordenadas locales (z = arriba), sobre la cota de su cubierta.
 
     El tramo de borde que linda con otra parte del mismo edificio igual o más alta se quita: ahí la cubierta
-    continúa (o sube un muro), no hay pretil.
+    continúa (o sube un muro), no hay pretil. `skip`: partes sin pretil (cubierta de teja).
     """
     meshes = []
     geoms, heights = list(group.geometry), tops
     for i, (geom, h) in enumerate(zip(geoms, heights)):
-        if geom.area < PARAPET_MIN_AREA_M2:
+        if geom.area < PARAPET_MIN_AREA_M2 or (skip and skip[i]):
             continue
         ring = geom.difference(geom.buffer(-PARAPET_THICKNESS_M, join_style="mitre"))
         neighbours = [g for j, (g, hj) in enumerate(zip(geoms, heights)) if j != i and hj >= h]
@@ -154,6 +281,10 @@ def main(argv=None):
                     help="Altura para partes con 0 plantas sobre rasante; 0 = omitirlas (por defecto)")
     ap.add_argument("--no-parapets", action="store_true", help="No generar pretiles en las azoteas")
     ap.add_argument("--flat", action="store_true", help="Sin relieve (no usar dem_local.tif)")
+    ap.add_argument("--no-hip-roofs", action="store_true", help="Sin tejados a cuatro aguas (solo color de teja)")
+    ap.add_argument("--no-doors", action="store_true", help="Sin puertas en los portales")
+    ap.add_argument("--ad-zip", type=Path, default=DEFAULT_AD_ZIP, help="Direcciones del Catastro (portales)")
+    ap.add_argument("--buildings", type=Path, default=DEFAULT_BUILDINGS, help="Huellas de Building")
     args = ap.parse_args(argv)
     dem = None if args.flat else LocalDEM.load()
 
@@ -172,30 +303,45 @@ def main(argv=None):
     materials: dict = {}
     stats = Counter()
     parapets_by_tile: dict[tuple[int, int], list[trimesh.Trimesh]] = {}
+    roofs_by_tile: dict[tuple[int, int], list[trimesh.Trimesh]] = {}
     for building_id, group in parts.groupby("buildingId", sort=True):
         levels = [part_levels(geom, float(h), dem) for geom, h in zip(group.geometry, group["height_m"])]
-        meshes, floors = [], []
+        meshes, floors, roof_attr = [], [], []
         part_floors = [max(1, int(f)) if f == f and f is not None else 1
                        for f in group["numberOfFloorsAboveGround"]]
-        for geom, (base, top), nf in zip(group.geometry, levels, part_floors):
+        use = group["currentUse"].iloc[0]
+        tiled = [rt == "tile" and use not in NO_PARAPET_USES
+                 for rt in (group["roof_type"] if "roof_type" in group else ["flat"] * len(group))]
+        c = group.geometry.union_all().centroid
+        tile_key = (int(c.x // TILE_M), int(c.y // TILE_M))
+        for geom, (base, top), nf, is_tile in zip(group.geometry, levels, part_floors, tiled):
+            frame = hip_frame(geom) if is_tile and not args.no_hip_roofs else None
+            if frame is not None:
+                corners, short, long_ = frame
+                rise = min(ROOF_MAX_RISE_M, ROOF_SLOPE * short / 2)
+                eave = max(top - HIP_EAVE_FACTOR * rise, base + FOUNDATION_SINK_M + 2.2)
+                roofs_by_tile.setdefault(tile_key, []).append(hip_roof(corners, short, long_, eave, rise))
+                stats["hip_roofs"] += 1
+                top = eave  # los muros llegan al alero; el tejado va aparte (ROOF_*)
             for m in extrude(geom, top - base):
                 m.apply_translation([0.0, 0.0, base])
                 meshes.append(m)
                 floors.append(np.full(len(m.vertices), nf, dtype=np.float32))
+                roof_attr.append(np.full(len(m.vertices), 1.0 if is_tile else 0.0, dtype=np.float32))
         if not meshes:
             stats["empty_buildings"] += 1
             continue
-        use = group["currentUse"].iloc[0]
         if not args.no_parapets and use not in NO_PARAPET_USES:
-            rails = parapets(group, [top for _, top in levels])
+            rails = parapets(group, [top for _, top in levels], skip=tiled)
             if rails:
                 stats["parapet_pieces"] += len(rails)
-                c = group.geometry.union_all().centroid
-                parapets_by_tile.setdefault((int(c.x // TILE_M), int(c.y // TILE_M)), []).extend(rails)
+                parapets_by_tile.setdefault(tile_key, []).extend(rails)
         mesh = trimesh.util.concatenate(meshes)
         # plantas de Catastro por vértice (concatenate apila los vértices en el mismo orden): el visor reparte las
         # ventanas con altura de planta = altura del muro / plantas. Se exporta como atributo glTF `_floors`.
         mesh.vertex_attributes["floors"] = np.concatenate(floors)
+        # 1 = cubierta de teja (el shader pinta de teja la cubierta plana de las partes que no llevan tejado ROOF_)
+        mesh.vertex_attributes["roof"] = np.concatenate(roof_attr)
         mesh.apply_transform(LOCAL_TO_GLTF)
         mesh.visual = trimesh.visual.TextureVisuals(material=material_for(use, materials))
         mesh.metadata = {"localId": building_id, "currentUse": use, "parts": len(group),
@@ -219,8 +365,28 @@ def main(argv=None):
         mesh.metadata = {"tile": [i, j], "tile_m": TILE_M, "pieces": len(rails)}
         scene.add_geometry(mesh, node_name=name, geom_name=name)
 
-    scene.metadata = {"source": args.input.name, "axes": "X=East, Y=Up, Z=-North",
-                      "units": "m", "collision_prefix": COLLISION_PREFIX, "decor_prefix": PARAPET_PREFIX}
+    # Tejados de teja y puertas: decoración por tesela, como los pretiles (no colisionan)
+    decor = [(ROOF_PREFIX, roofs_by_tile, "MAT_roof_tile", ROOF_COLOR)]
+    if not args.no_doors and args.ad_zip.exists() and args.buildings.exists():
+        origin = json.loads(DEFAULT_META.read_text(encoding="utf-8"))["origin_epsg25829"]
+        footprints = gpd.read_file(args.buildings)
+        footprints = footprints[footprints["localId"].isin(parts["buildingId"])]  # solo edificios con volumen
+        doors_by_tile, door_stats = door_meshes(load_entrances(args.ad_zip, origin), footprints, dem)
+        stats.update({f"doors_{k}": v for k, v in door_stats.items()})
+        decor.append((DOOR_PREFIX, doors_by_tile, "MAT_door", DOOR_COLOR))
+    for prefix, by_tile, mat_name, color in decor:
+        material = trimesh.visual.material.PBRMaterial(name=mat_name, baseColorFactor=color,
+                                                       metallicFactor=0.0, roughnessFactor=0.85)
+        for (i, j), pieces in sorted(by_tile.items()):
+            mesh = trimesh.util.concatenate(pieces)
+            mesh.apply_transform(LOCAL_TO_GLTF)
+            mesh.visual = trimesh.visual.TextureVisuals(material=material)
+            name = f"{prefix}{i}_{j}"
+            mesh.metadata = {"tile": [i, j], "tile_m": TILE_M, "pieces": len(pieces)}
+            scene.add_geometry(mesh, node_name=name, geom_name=name)
+
+    scene.metadata = {"source": args.input.name, "axes": "X=East, Y=Up, Z=-North", "units": "m",
+                      "collision_prefix": COLLISION_PREFIX, "decor_prefixes": [PARAPET_PREFIX, ROOF_PREFIX, DOOR_PREFIX]}
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_bytes(scene.export(file_type="glb"))
 
@@ -228,7 +394,8 @@ def main(argv=None):
         "output": str(args.output.relative_to(ROOT) if args.output.is_relative_to(ROOT) else args.output),
         "nodes": stats["buildings"], "parts_extruded": stats["parts"], "parts_skipped_zero_height": skipped,
         "empty_buildings": stats["empty_buildings"], "materials": len(materials),
-        "parapet_pieces": stats["parapet_pieces"],
+        "parapet_pieces": stats["parapet_pieces"], "hip_roofs": stats["hip_roofs"],
+        "doors": {k[6:]: v for k, v in stats.items() if k.startswith("doors_")},
         "vertices": int(sum(len(g.vertices) for g in scene.geometry.values())),
         "triangles": int(sum(len(g.faces) for g in scene.geometry.values())),
         "bounds_gltf": np.round(scene.bounds, 3).tolist(),

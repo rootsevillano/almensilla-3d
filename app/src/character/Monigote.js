@@ -49,7 +49,19 @@ export class Monigote extends THREE.Group {
 
     this.add(createBlobShadow());
     this.phase = 0;
+    this.opacity = 1;
     this.idleTime = 0;
+  }
+
+  /** Opacidad del cuerpo (1 = opaco). Solo se activa la transparencia cuando hace falta (cámara muy cerca). */
+  setOpacity(a) {
+    if (Math.abs(a - this.opacity) < 0.01) return;
+    const wasTransparent = this.opacity < 1;
+    this.opacity = a;
+    WHITE.opacity = a;
+    WHITE.transparent = a < 1;
+    WHITE.depthWrite = a >= 1;
+    if (wasTransparent !== WHITE.transparent) WHITE.needsUpdate = true;
   }
 
   /** speed en m/s; runFactor 0..1 (andar..correr) solo cambia la amplitud del gesto. */

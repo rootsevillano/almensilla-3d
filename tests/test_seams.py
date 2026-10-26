@@ -79,3 +79,38 @@ def test_trees_on_terrain(trees, terrain_surface, rng):
     diffs = [t[iy] - terrain_surface.height(t[ix], t[iz]) for t in sample if terrain_surface.height(t[ix], t[iz]) is not None]
     diffs = np.asarray(diffs)
     assert np.abs(diffs).max() < 0.05, f"árboles separados del terreno hasta {np.abs(diffs).max():.3f} m"
+
+
+def test_doors_on_facades(scenes):
+    """Cada puerta (DOOR_) está pegada a una fachada de su edificio y sobresale hacia la calle (centro fuera de la
+    huella y a menos de 10 cm de su contorno)."""
+    import geopandas as gpd
+    import shapely
+    from conftest import PROCESSED, require
+
+    footprints = gpd.read_file(require(PROCESSED / "catastro_buildings.geojson"))
+    tree = shapely.STRtree(footprints.geometry.values)
+    outlines = shapely.union_all(list(footprints.geometry.boundary))
+    centers = []
+    for node, mesh in scenes["almensilla_buildings.glb"].geometry.items():
+        if node.startswith("DOOR_"):
+            v = mesh.vertices
+            per_door = 8 if len(v) % 8 == 0 else 36
+            centers += [v[k:k + per_door].mean(axis=0) for k in range(0, len(v), per_door)]
+    assert len(centers) > 1000, f"solo {len(centers)} puertas"
+    inside = far = 0
+    for c in centers:
+        p = shapely.Point(c[0], -c[2])
+        inside += bool(len(tree.query(p, predicate="within")))
+        far += outlines.distance(p) > 0.1
+    assert inside == 0, f"{inside} puertas metidas en el edificio"
+    assert far == 0, f"{far} puertas separadas más de 10 cm de la fachada"
+
+
+def test_zebra_markings_on_carriageway(scenes, terrain_surface, rng):
+    meshes = [m for n, m in scenes["almensilla_roads.glb"].geometry.items() if n.startswith("ROAD_marking")]
+    if not meshes:
+        pytest.skip("sin pasos de cebra en el término")
+    pts = np.concatenate([m.triangles_center for m in meshes])
+    m = _margins(_sample(pts, 500, rng), terrain_surface)
+    assert m.min() > 0.06, f"pasos de cebra a {m.min():.3f} m del terreno (calzada a 0.06 m, marcas 1 cm encima)"

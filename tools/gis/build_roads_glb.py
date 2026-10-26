@@ -112,6 +112,75 @@ def load_origin(meta_path: Path) -> tuple[float, float]:
     return DEFAULT_ORIGIN
 
 
+# Pasos de cebra (inspección: 103 nodos highway=crossing; 82 crossing=uncontrolled, sin semáforo; ninguno unmarked)
+MARKING_COLOR = (236, 236, 230, 255)
+MARKING_Y = 0.01  # sobre la calzada (ROAD_Y); el visor les da además más desfase de profundidad
+ZEBRA_STRIPE_W = 0.5
+ZEBRA_GAP = 0.5
+ZEBRA_LENGTH = 3.0  # a lo largo de la calle
+ZEBRA_MARGIN = 0.3  # libre junto al bordillo
+
+
+def zebra_crossings(osm_path: Path, origin, roads: gpd.GeoDataFrame, within=None) -> tuple[list[Polygon], Counter]:
+    """Franjas de los pasos de cebra en los nodos de cruce que están sobre una vía de calzada: paralelas a la calle,
+    repartidas a lo ancho de la calzada (anchura − 2·acera). `within`: solo los cruces dentro de ese polígono
+    (el OSM incluye municipios vecinos: de los 103 cruces, solo ~5 están en el término de Almensilla)."""
+    nodes, crossing, way_nodes, tags, nds = {}, set(), {}, {}, []
+    carriage = roads[roads["group"] == "carriageway"].set_index("osm_id")
+    for _, el in ET.iterparse(osm_path, events=("end",)):
+        if el.tag == "tag":
+            tags[el.get("k")] = el.get("v")
+            continue
+        if el.tag == "nd":
+            nds.append(el.get("ref"))
+            continue
+        if el.tag == "node":
+            nodes[el.get("id")] = (float(el.get("lon")), float(el.get("lat")))
+            if tags.get("highway") == "crossing" and tags.get("crossing") != "unmarked":
+                crossing.add(el.get("id"))
+        elif el.tag == "way" and int(el.get("id")) in carriage.index:
+            way_nodes[int(el.get("id"))] = list(nds)
+        if el.tag in ("node", "way", "relation"):
+            tags, nds = {}, []
+            el.clear()
+    to_utm = Transformer.from_crs("EPSG:4326", "EPSG:25829", always_xy=True)
+
+    def local(ref):
+        e, n = to_utm.transform(*nodes[ref])
+        return np.array([e - origin[0], n - origin[1]])
+
+    stripes, stats, done = [], Counter(), set()
+    for wid, refs in way_nodes.items():
+        for k, ref in enumerate(refs):
+            if ref not in crossing or ref in done:
+                continue
+            a, b = refs[max(0, k - 1)], refs[min(len(refs) - 1, k + 1)]
+            if a == b:
+                continue
+            p, d = local(ref), local(b) - local(a)
+            if within is not None and not within.contains(shapely.Point(*p)):
+                done.add(ref)
+                stats["outside_municipality"] += 1
+                continue
+            d /= np.linalg.norm(d)
+            n = np.array([-d[1], d[0]])
+            row = carriage.loc[wid]
+            width = float(row["width_m"]) - 2 * float(row["sidewalk_m"]) - 2 * ZEBRA_MARGIN
+            if width < 2.0:
+                stats["too_narrow"] += 1
+                continue
+            for o in np.arange(-width / 2 + ZEBRA_STRIPE_W / 2, width / 2, ZEBRA_STRIPE_W + ZEBRA_GAP):
+                c = p + n * o
+                hl, hw = d * ZEBRA_LENGTH / 2, n * ZEBRA_STRIPE_W / 2
+                stripes.append(Polygon([c - hl - hw, c + hl - hw, c + hl + hw, c - hl + hw]))
+            done.add(ref)
+            stats["crossings"] += 1
+    stats["crossing_nodes"] = len(crossing)
+    stats["not_on_carriageway"] = len(crossing - done) - stats["too_narrow"]
+    stats["crossings"] = stats["crossings"]  # aunque sea 0, que aparezca en el resumen
+    return stripes, stats
+
+
 def load_osm_roads(osm_path: Path, origin) -> gpd.GeoDataFrame:
     nodes, ways, tags, nds = {}, [], {}, []
     for _, el in ET.iterparse(osm_path, events=("end",)):
@@ -428,6 +497,29 @@ def main(argv=None):
                                  "area_m2": round(float(piece.area), 1)}
                 scene.add_geometry(mesh, node_name=name, geom_name=name)
                 area_by_group[group] += piece.area
+
+    # Pasos de cebra: franjas recortadas a la calzada y drapeadas sobre ella (ROAD_marking_*)
+    stripes, zebra_stats = zebra_crossings(args.osm, origin, roads, within=municipality)
+    markings = shapely.union_all(stripes).intersection(surfaces["carriageway"]) if stripes else None
+    marking_material = trimesh.visual.material.PBRMaterial(name="MAT_road_marking", baseColorFactor=MARKING_COLOR,
+                                                           metallicFactor=0.0, roughnessFactor=0.8)
+    for i in range(i0, i1 + 1):
+        for j in range(j0, j1 + 1):
+            if markings is None:
+                break
+            polys = polygons_of(markings.intersection(box(i * args.tile, j * args.tile,
+                                                          (i + 1) * args.tile, (j + 1) * args.tile)))
+            if not polys:
+                continue
+            mesh = (flat_mesh(split_by_terrain_triangles(polys), ROAD_Y + MARKING_Y, dem, segment=False)
+                    if dem is not None else flat_mesh(polys, ROAD_Y + MARKING_Y))
+            if mesh is None:
+                continue
+            mesh.visual = trimesh.visual.TextureVisuals(material=marking_material)
+            name = f"ROAD_marking_{i}_{j}"
+            mesh.metadata = {"group": "marking", "tile": [i, j], "tile_m": args.tile}
+            scene.add_geometry(mesh, node_name=name, geom_name=name)
+            area_by_group["marking"] += sum(p.area for p in polys)
     scene.metadata = {"source": args.osm.name, "axes": "X=East, Y=Up, Z=-North", "units": "m",
                       "road_y_m": ROAD_Y, "curb_height_m": CURB_HEIGHT_M, "walkable_prefix": "ROAD_"}
     args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -440,7 +532,7 @@ def main(argv=None):
         "output": args.output.name, "lines": args.lines.name, "origin_epsg25829": list(origin),
         "ways": len(roads), "ways_by_group": roads["group"].value_counts().to_dict(),
         "width_sources": roads["width_source"].value_counts().to_dict(),
-        "ways_with_sidewalk": int((roads["sidewalk_m"] > 0).sum()),
+        "ways_with_sidewalk": int((roads["sidewalk_m"] > 0).sum()), "zebra": dict(zebra_stats),
         "sidewalk_m_by_count": roads.loc[roads["sidewalk_m"] > 0, "sidewalk_m"].value_counts().to_dict(),
         "municipality_km2": round(municipality.area / 1e6, 3),
         "nodes": len(scene.geometry),

@@ -51,6 +51,10 @@ export function applyGroundMaterials(...roots) {
       out.polygonOffsetFactor = -2;
       out.polygonOffsetUnits = -4;
     }
+    if (mat.name === 'MAT_road_marking') { // pasos de cebra: 1 cm sobre la calzada, más cerca aún en profundidad
+      out.polygonOffsetFactor = -4;
+      out.polygonOffsetUnits = -8;
+    }
     cache.set(mat, out);
     return out;
   };

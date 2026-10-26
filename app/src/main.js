@@ -42,8 +42,9 @@ scene.add(models.terrain, models.roads);
 let collisionMeshes;
 let buildingsRoot;
 let parapets;
+let doors = [];
 if (MERGE) {
-  ({ merged: buildingsRoot, collisionMeshes, parapets } = mergeBuildings(models.buildings));
+  ({ merged: buildingsRoot, collisionMeshes, parapets, doors } = mergeBuildings(models.buildings));
 } else {
   collisionMeshes = [];
   parapets = [];
@@ -72,7 +73,7 @@ scene.add(trees.root);
 const shadows = SHADOWS ? new SunShadows(renderer, sun, scene) : null;
 if (shadows) enableShadows({ casters: [buildingsRoot], receivers: [models.terrain, models.roads, buildingsRoot] });
 // Después de enableShadows: el LOD quita la sombra a los pretiles y la limita a los árboles cercanos
-const lod = LOD ? new LodManager({ parapets, trees: trees.root.children, treeShadows: SHADOWS }) : null;
+const lod = LOD ? new LodManager({ parapets, doors, trees: trees.root.children, treeShadows: SHADOWS }) : null;
 
 const center = urbanCenter(collisionMeshes);
 controls.target.copy(center);
@@ -93,6 +94,7 @@ if (!BENCH_S) {
   for (const root of [models.terrain, models.roads]) root.traverse((o) => o.isMesh && ground.push(o));
   const t1 = performance.now();
   const collider = new FootprintCollider(collisionMeshes);
+  collider.addCircles(trees.trunks); // el personaje también choca con los troncos
   console.log(`[character] ${collider.segments.length} muros indexados en ${(performance.now() - t1).toFixed(0)} ms`);
   character = new Monigote();
   if (shadows) {

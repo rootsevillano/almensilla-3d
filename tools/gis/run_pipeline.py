@@ -5,9 +5,10 @@ Pasos (cada uno es un script de tools/gis/, ejecutado con `python -P`; ver `.cla
   download     download_ign.py            datos IGN (ortofoto, MDT05, MDSn): solo con --download; es idempotente
   extract      extract_catastro_buildings  Catastro BU -> data/processed (huellas, partes, piscinas)
   lidar        apply_lidar_heights        alturas de las partes con el MDSn de edificación
+  roofs        classify_roofs             tipo de cubierta (teja / azotea) con el color de la ortofoto
   dem          dem.py                     MDT05 -> malla local suavizada (cota cero en el origen)
-  buildings    build_buildings_glb        data/export/almensilla_buildings.glb
-  roads        build_roads_glb            data/export/almensilla_roads.glb + data/processed/osm_roads.geojson
+  buildings    build_buildings_glb        data/export/almensilla_buildings.glb (+ tejados, pretiles, puertas)
+  roads        build_roads_glb            data/export/almensilla_roads.glb (+ pasos de cebra) y osm_roads.geojson
   terrain      build_terrain_glb          data/export/almensilla_terrain.glb (necesita osm_roads)
   trees        build_trees                data/export/almensilla_trees.json (necesita osm_roads)
   ortho        build_ortho_textures       data/export/ortho/
@@ -34,6 +35,7 @@ STEPS = [
     ("download", "download_ign.py"),
     ("extract", "extract_catastro_buildings.py"),
     ("lidar", "apply_lidar_heights.py"),
+    ("roofs", "classify_roofs.py"),
     ("dem", "dem.py"),
     ("buildings", "build_buildings_glb.py"),
     ("roads", "build_roads_glb.py"),

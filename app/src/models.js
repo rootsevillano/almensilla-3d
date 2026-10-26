@@ -10,6 +10,8 @@ const MODELS = {
 };
 export const COLLISION_PREFIX = 'COL_';
 export const PARAPET_PREFIX = 'PARAPET_';
+export const ROOF_PREFIX = 'ROOF_';
+export const DOOR_PREFIX = 'DOOR_';
 
 export async function loadModels(onProgress) {
   const loader = new GLTFLoader();
@@ -60,11 +62,15 @@ export function mergeBuildings(root) {
   }
   for (const mesh of collisionMeshes) mesh.removeFromParent();
 
-  // Pretiles (PARAPET_<i>_<j>): decoración ya agrupada por tesela en el GLB; no colisionan
-  const parapets = [];
-  root.traverse((obj) => obj.isMesh && obj.name.startsWith(PARAPET_PREFIX) && parapets.push(obj));
-  for (const mesh of parapets) merged.add(mesh); // add() lo saca de su padre anterior
-  return { merged, collisionMeshes, parapets };
+  // Decoración ya agrupada por tesela en el GLB (no colisiona): pretiles, tejados de teja y puertas
+  const decor = { parapets: [], roofs: [], doors: [] };
+  const kinds = [[PARAPET_PREFIX, 'parapets'], [ROOF_PREFIX, 'roofs'], [DOOR_PREFIX, 'doors']];
+  root.traverse((obj) => {
+    const kind = obj.isMesh && kinds.find(([prefix]) => obj.name.startsWith(prefix));
+    if (kind) decor[kind[1]].push(obj);
+  });
+  for (const mesh of Object.values(decor).flat()) merged.add(mesh); // add() lo saca de su padre anterior
+  return { merged, collisionMeshes, ...decor };
 }
 
 /** Centro del casco: mediana de los centros de los edificios (robusta frente a cortijos dispersos). */

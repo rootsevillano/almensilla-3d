@@ -68,11 +68,51 @@ export class FootprintCollider {
     return found;
   }
 
-  /** Empuja `pos` (Vector3, usa x/z) fuera de los muros. Devuelve true si hubo contacto. */
+  /**
+   * Obstáculos circulares (troncos de árbol): `circles` = [x, z, r, x, z, r, …]. Van en una rejilla aparte: con
+   * 72 000 árboles, aproximarlos con segmentos supondría cientos de miles más.
+   */
+  addCircles(circles) {
+    this.circles = new Map();
+    const s = this.cellSize;
+    for (let k = 0; k < circles.length; k += 3) {
+      const key = this.#key(Math.floor(circles[k] / s), Math.floor(circles[k + 1] / s));
+      if (!this.circles.has(key)) this.circles.set(key, []);
+      this.circles.get(key).push(circles[k], circles[k + 1], circles[k + 2]);
+    }
+    this.circleCount = circles.length / 3;
+  }
+
+  #pushFromCircles(pos, radius) {
+    if (!this.circles) return false;
+    const s = this.cellSize;
+    let hit = false;
+    for (let i = Math.floor((pos.x - radius - 1) / s); i <= Math.floor((pos.x + radius + 1) / s); i++) {
+      for (let j = Math.floor((pos.z - radius - 1) / s); j <= Math.floor((pos.z + radius + 1) / s); j++) {
+        const cell = this.circles.get(this.#key(i, j));
+        if (!cell) continue;
+        for (let k = 0; k < cell.length; k += 3) {
+          const dx = pos.x - cell[k];
+          const dz = pos.z - cell[k + 1];
+          const min = radius + cell[k + 2];
+          const d2 = dx * dx + dz * dz;
+          if (d2 >= min * min) continue;
+          const d = Math.sqrt(d2) || 1e-6;
+          pos.x += (dx / d) * (min - d);
+          pos.z += (dz / d) * (min - d);
+          hit = true;
+        }
+      }
+    }
+    return hit;
+  }
+
+  /** Empuja `pos` (Vector3, usa x/z) fuera de los muros y de los troncos. Devuelve true si hubo contacto. */
   resolve(pos, radius, iterations = 3) {
     let hit = false;
     for (let it = 0; it < iterations; it++) {
-      let moved = false;
+      let moved = this.#pushFromCircles(pos, radius);
+      hit ||= moved;
       for (const [ax, az, bx, bz] of this.#nearby(pos.x, pos.z, radius)) {
         const dx = bx - ax;
         const dz = bz - az;

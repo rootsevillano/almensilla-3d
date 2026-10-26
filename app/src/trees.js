@@ -28,6 +28,9 @@ function crownLow(radius, y, scale, hex) {
   return colored(new THREE.OctahedronGeometry(radius, 0).scale(...scale).translate(0, y, 0), hex);
 }
 
+// Radio de la base del tronco de cada modelo (SHAPES.high); los arbustos no tienen tronco: no bloquean el paso
+const TRUNK_RADIUS = { broadleaf: 0.18, olive: 0.24, pine: 0.3 };
+
 // Formas por tipo (alturas en metros, escala 1). `low`: LOD lejano de 8 triángulos (copa sin tronco).
 const SHAPES = {
   broadleaf: {
@@ -90,5 +93,11 @@ export async function loadTrees(url, { castShadow = false } = {}) {
     mesh.userData.lod = { high: geometries[type], low: lowGeometries[type] };
     root.add(mesh);
   }
-  return { root, count: data.trees.length, meshes: root.children.length };
+  // Troncos para la colisión del personaje: radio de la base del tronco del modelo × escala horizontal
+  const trunks = [];
+  for (const [x, z, type, scale, , width = scale] of data.trees) {
+    const r = TRUNK_RADIUS[data.types[type]];
+    if (r) trunks.push(x, z, r * width);
+  }
+  return { root, count: data.trees.length, meshes: root.children.length, trunks };
 }

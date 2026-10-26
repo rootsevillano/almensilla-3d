@@ -17,6 +17,8 @@ const CAM_MAX = 14;
 const CAM_PITCH = 0.32;
 const CAM_LERP = 10.0;
 const CAM_WALL_GAP = 0.3;
+const FADE_NEAR_M = 0.6; // distancia cámara–ojos: opacidad mínima por debajo…
+const FADE_FAR_M = 1.6; // …y opaco por encima
 
 const KEYS = {
   forward: ['KeyW', 'ArrowUp'],
@@ -201,5 +203,8 @@ export class CharacterController {
     if (groundY !== null) desired.y = Math.max(desired.y, groundY + 0.3);
     this.camera.position.lerp(desired, hit ? 1 : 1 - Math.exp(-CAM_LERP * dt));
     this.camera.lookAt(pivot);
+    // Con la cámara pegada (contra un muro), el monigote se vuelve semitransparente para no tapar la vista
+    const d = this.camera.position.distanceTo(pivot);
+    this.character.setOpacity(THREE.MathUtils.clamp((d - FADE_NEAR_M) / (FADE_FAR_M - FADE_NEAR_M), 0.25, 1));
   }
 }
