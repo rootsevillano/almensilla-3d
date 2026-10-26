@@ -12,7 +12,7 @@ export function createViewer(canvas) {
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.0;
+  renderer.toneMappingExposure = 1.12; // la cal debe leerse blanca también en las fachadas a la sombra
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(SKY_COLOR);
@@ -22,7 +22,7 @@ export function createViewer(canvas) {
   const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 1, 8000);
   camera.position.set(-600, 520, 900);
 
-  const hemi = new THREE.HemisphereLight(0xdcecff, 0x8a7a5a, 1.1);
+  const hemi = new THREE.HemisphereLight(0xdcecff, 0xb8a888, 1.7);
   scene.add(hemi);
   const sun = new THREE.DirectionalLight(0xfff1dc, 2.4);
   sun.position.set(-0.35, 1.0, 0.55).multiplyScalar(1000); // glTF: X=Este, Y=arriba, Z=-Norte -> sol al sur-oeste

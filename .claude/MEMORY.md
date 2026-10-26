@@ -315,8 +315,92 @@ Todos los GML de AD y BU van en **ISO-8859-1**; los de CP en **UTF-8** (lo gesti
   104 a pie y 188 en el bench orbital. Las teselas encarecen un poco la vista aérea lejana sin sombras
   (155 frente a 105 draw calls, +0.24 ms) y abaratan mucho la vista a pie.
 
+### 2026-10-26 · Git (estado comprobado)
+- El usuario subió la rama y fusionó el PR #1 en `main` (solo el primer commit del pipeline). La aplicación completa
+  (visor, monigote, sombras) está en `origin/gis/catastro-buildings-glb` (commit `fdbab44`), aún no en `main`.
+
+### 2026-10-26 · Fase 1 de realismo
+Hoja de ruta acordada: (1) con datos actuales: fachadas, azoteas, aceras, piscinas y árboles; (2) datos abiertos del
+IGN/CNIG (ortofoto PNOA, LiDAR, MDT05; CC BY 4.0); (3) edificios singulares, mobiliario, LOD.
+- **Pretiles** (`build_buildings_glb.py`, agente 01): anillo de 0.2 m × 0.9 m sobre el borde de cada parte; se quita el
+  tramo que linda con otra parte del mismo edificio igual o más alta; sin pretil en naves (`3_industrial`,
+  `2_agriculture`) ni en partes de menos de 6 m². Anillo simplificado 10 cm. 9281 piezas. Edificios: 217 k → 525 k
+  triángulos, 5.0 → 10.3 MB (sin simplificar eran 668 k y 13.3 MB). QA: 0 NaN, 0 volumen negativo, winding consistente.
+  La colisión del personaje no cambia (64 754 muros: los pretiles no arrancan en Y=0).
+- **Aceras con bordillo** (`build_roads_glb.py`): `sidewalk_m` por lado según la anchura total (≥9 m → 1.5; ≥7.5 → 1.2;
+  ≥6.5 → 0.9; menos → sin acera, casco estrecho) solo en calles urbanas de secondary/tertiary/unclassified/residential/
+  construction/living_street. Calzada = buffer de (anchura − 2·acera)/2; acera = superficie de calzada − calzada (en los
+  cruces gana la calzada → esquinas solas), sin astillas de menos de 20 cm. Aceras = losas de 15 cm (`ROAD_sidewalk_*`,
+  tapa a Y=0.17). 207 vías con acera; calzada 491 105 m² + aceras 95 842 m² = calzada anterior. Viales: 0.80 MB.
+- **Piscinas** (`build_terrain_glb.py`): 912 `openAirPool` de Catastro recortadas del terreno; `POOL_water_*` (lámina a
+  ras, 28 141 m²) y `POOL_coping_*` (borde de 0.35 m y 6 cm, 7948 m²). Terreno + piscinas = terreno anterior.
+  Terreno: 9 k → 106 k triángulos (los 912 huecos), 2.08 MB. OSM solo tiene 550 `leisure=swimming_pool`.
+- **Árboles** (`tools/gis/build_trees.py` → `data/export/almensilla_trees.json`, nuevo artefacto del agente 01):
+  inspección OSM: 11 `natural=tree`, 29 parques, 10 jardines, 19 `landuse=orchard` (9 `trees=olive_trees`), 5 `wood`,
+  12 `heath`, 1 `scrub`. Árboles sueltos en su sitio; parques/jardines → árbol de sombra en rejilla con jitter;
+  huertos → olivos en hileras alineadas con el rectángulo mínimo de la parcela (7 m); bosques → pino piñonero;
+  matorral disperso. Se descartan puntos sobre edificios (+1.5 m), viales (+1 m), piscinas (+1 m) o fuera del término.
+  Resultado: 29 936 (28 342 olivos, 517 de sombra, 481 pinos, 596 matorrales), semilla fija 41010, 724 KB.
+  Formato `{types, fields, trees: [[x, z, tipo, escala]]}` en coordenadas glTF. `sync-models` comprueba su estructura.
+- **Visor** (agente 02):
+  - `src/facades.js`: atributo `facade` por vértice (u a lo largo del muro, longitud del muro, tipo muro/cubierta/
+    pretil, coronación) y shader sobre MeshStandardMaterial: cal `#f4f2ea`, zócalo albero `#e0c27f` hasta 0.65 m,
+    cornisa, una ventana con marco y reja por hueco de ~3.2 m en cada planta de 3 m (que quepa bajo la coronación),
+    escaparates en planta baja en `retail`, naves grises sin ventanas, azotea `#d8cfbf`. A distancia el patrón se funde
+    con el color medio (`fwidth`) para evitar muaré.
+  - `src/ground.js`: baldosa de 40 cm en aceras (shader en coordenadas de mundo) y agua para las piscinas.
+  - `src/trees.js`: árboles low-poly (tronco + copa icosaédrica, colores por vértice, 32 triángulos el olivo) en una
+    InstancedMesh por tipo y tesela de 500 m (culling y sombras).
+  - Luz: HemisphereLight 1.1 → 1.7 y exposición 1.0 → 1.12 (la cal salía gris en las fachadas a la sombra).
+- **Medidas** (GPU por fotograma a 1080p, lienzo 2400×1350, con sombras; benchmark sintético renderizando a mano porque
+  la ventana de Claude no estaba a la vista y el navegador solo pintaba 2 FPS):
+  - A pie: 4.80 ms p50 / 5.71 p99 (antes de la fase 1: 2.99), 179 draw calls, 0.91 M triángulos.
+  - Órbita r=900 m: 7.36 ms p50 / 7.88 p99 (antes 3.93), 250 draw calls, 1.94 M triángulos.
+  - Árboles en la órbita: ~0.75 ms (sin árboles 6.67 ms; árboles sin sombra 6.99 ms). El resto de la subida viene de
+    los pretiles (también en la pasada de sombras) y del shader de fachadas.
+  - **FPS reales** (ventana a la vista, panel pintando a 145 FPS, 1080p emulado, lienzo 2400×1350, monitor 144 Hz):
+
+    | Escena | FPS medio | 1 % low | Fotograma p50 | GPU p50 / p99 | Draw calls | Triángulos |
+    |---|---|---|---|---|---|---|
+    | `?bench=20` órbita, con sombras | 90.9 | 70.9 | 13.8 ms | 8.00 / 9.95 ms | 260 | 2.00 M |
+    | `?bench=20` órbita, sin sombras | 115.1 | 71.4 | 7.0 ms | 5.78 / 7.47 ms | 214 | 1.14 M |
+    | Personaje (20 s andando/corriendo), con sombras | 132.4 | 71.4 | 7.0 ms | 4.72 / 6.78 ms | 251 | 1.15 M |
+    | Personaje, sin sombras | 142.5 | 73.0 | 6.9 ms | 3.52 / 5.27 ms | 231 | 0.91 M |
+
+    Cumple el criterio QA 2 (≥60 FPS a 1080p) en esta máquina en todos los casos. En la órbita con sombras la GPU
+    (8 ms) supera el intervalo de 144 Hz (6.94 ms) y muchos fotogramas caen a la cadencia de 72 FPS; con vsync a 60 Hz
+    no se notaría. Falta medir en un "equipo estándar" (agente 04): ahí la vista aérea con sombras es la más justa.
+
+### 2026-10-26 · Optimización de la vista aérea (LOD)
+- **Pretiles fuera de las mallas `COL_`** (`build_buildings_glb.py`): nodos decorativos `PARAPET_<i>_<j>` por tesela de
+  500 m (39 nodos), material `MAT_parapet`, sin cara inferior (apoya en la azotea). Las `COL_` vuelven a ser solo los
+  volúmenes: 217 744 triángulos, estancas. Pretiles: 237 597 triángulos (antes ~308 k con cara inferior). GLB 9.67 MB.
+  El visor los añade al grupo fusionado tal cual (`mergeBuildings` devuelve `parapets`) con material de cal lisa.
+- **`app/src/lod.js` (`LodManager`)**, por tesela y distancia de la cámara al borde de su bounding sphere, en cada
+  fotograma: pretiles sin sombra nunca y ocultos a más de 700 m (~2 px de alto a 1080p); árboles con sombra solo a menos
+  de 220 m, copa simple de 8 triángulos (octaedro, sin tronco) a más de 350 m y ocultos a más de 2200 m (la niebla ya
+  los tapa). `?lod=0` lo desactiva para comparar. `window.__almensilla.lod.stats` cuenta teselas por estado.
+- **Medidas** (FPS reales, ventana a la vista, 1080p emulado, lienzo 2400×1350, 144 Hz; misma sesión para comparar):
+
+  | Escena | FPS medio | 1 % low | GPU p50 / p99 | Triángulos | Draw calls |
+  |---|---|---|---|---|---|
+  | `?bench=20` órbita con sombras, **sin LOD** | 75.5 | 47.8 | 9.26 / 11.64 ms | 1.90 M | 287 |
+  | `?bench=20` órbita con sombras, **con LOD** | 96.8 | 71.4 | 6.42 / 8.53 ms | 0.68 M | 251 |
+  | `?bench=20` órbita sin sombras, con LOD | 106.0 | 71.4 | 5.61 / 7.56 ms | 0.52 M | 218 |
+  | Personaje con sombras, con LOD | 129.7 | 71.4 | 4.28 / 6.00 ms | 0.75 M | 252 |
+
+  El LOD recorta un 31 % la GPU en la vista aérea con sombras y sube el 1 % low de 47.8 a 71.4 FPS. Ojo: la GPU de esta
+  sesión iba más lenta que en la medida anterior (órbita con sombras sin LOD: 9.26 ms ahora, 8.0 ms antes); comparar
+  siempre dentro de la misma sesión.
+- Lo que queda en la vista aérea ya no son las sombras (~0.8 ms) sino la pasada principal (~5.6 ms: fachadas y terreno
+  a 2400×1350). Si hiciera falta más: LOD de edificios lejanos (sin shader de ventanas o cajas simplificadas por
+  tesela), bajar el pixel ratio en la vista aérea o reducir el radio de la niebla.
+
 ### Pendiente / bloqueos
-- Push/PR de `gis/catastro-buildings-glb` y de los cambios de viales, terreno, visor, personaje y sombras: lo hace el usuario a mano.
+- Push/PR de los cambios de viales, terreno, visor, personaje, sombras, fase 1 y LOD: lo hace el usuario a mano.
+- Fase 1, cosas que faltan: puertas (se podrían colocar en las 3131 entradas de portal de AD), pasos de cebra
+  (93 nodos `crossing`), árboles de alineación en aceras (no están en OSM), colisión con árboles, el personaje
+  "flota" sobre el agua de las piscinas, tejados de teja.
 - Sombras: fuera del radio del mapa (≤512 m del foco) no hay sombra; en vista aérea muy lejana se nota el corte
   (lo suaviza la niebla). Si hiciera falta: cascadas (CSM) o desvanecer la sombra en el borde del mapa.
 - Personaje: la cámara muy cerca (contra un muro) queda dentro de la cabeza; se podría atenuar el monigote cuando la
@@ -326,5 +410,4 @@ Todos los GML de AD y BU van en **ISO-8859-1**; los de CP en **UTF-8** (lo gesti
 - Relieve: el terreno es plano. Para cota real haría falta el MDT05 del CNIG/IGN (lo descarga el usuario); entonces
   habrá que asentar edificios y viales sobre el MDT y resolver los puentes (`bridge=*`, `layer`).
 - Fuera del término municipal no hay suelo: de momento lo tapa la niebla (700–3600 m); con zoom lejano se ve el borde.
-- Aceras/calzada no se distinguen: la superficie de vial es de fachada a fachada.
 - trimesh no tiene `networkx` (algunas utilidades de `trimesh.repair` fallan); no hace falta para la extrusión.

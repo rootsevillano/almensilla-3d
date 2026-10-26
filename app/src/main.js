@@ -3,15 +3,20 @@ import { createViewer } from './scene.js';
 import { loadModels, mergeBuildings, urbanCenter } from './models.js';
 import { Benchmark, FpsMeter, GpuTimer } from './stats.js';
 import { SunShadows, enableShadows } from './shadows.js';
+import { applyFacades } from './facades.js';
+import { applyGroundMaterials } from './ground.js';
+import { loadTrees } from './trees.js';
+import { LodManager } from './lod.js';
 import { Monigote } from './character/Monigote.js';
 import { FootprintCollider } from './character/collision.js';
 import { CharacterController } from './character/controller.js';
 
 // Parámetros de URL: ?merge=0 desactiva la fusión de edificios; ?shadows=0 desactiva las sombras;
-// ?bench=20 órbita automática de 20 s y resultado.
+// ?lod=0 desactiva el nivel de detalle; ?bench=20 órbita automática de 20 s y resultado.
 const params = new URLSearchParams(window.location.search);
 const MERGE = params.get('merge') !== '0';
 const SHADOWS = params.get('shadows') !== '0';
+const LOD = params.get('lod') !== '0';
 const BENCH_S = Number(params.get('bench')) || 0;
 const BENCH_RADIUS_M = 900;
 const BENCH_HEIGHT_M = 420;
@@ -29,19 +34,27 @@ const loadMs = performance.now() - t0;
 scene.add(models.terrain, models.roads);
 let collisionMeshes;
 let buildingsRoot;
+let parapets;
 if (MERGE) {
-  const result = mergeBuildings(models.buildings);
-  collisionMeshes = result.collisionMeshes;
-  buildingsRoot = result.merged;
+  ({ merged: buildingsRoot, collisionMeshes, parapets } = mergeBuildings(models.buildings));
 } else {
   collisionMeshes = [];
+  parapets = [];
   models.buildings.traverse((o) => o.isMesh && o.name.startsWith('COL_') && collisionMeshes.push(o));
+  models.buildings.traverse((o) => o.isMesh && o.name.startsWith('PARAPET_') && parapets.push(o));
   buildingsRoot = models.buildings;
 }
 scene.add(buildingsRoot);
+applyFacades(buildingsRoot);
+applyGroundMaterials(models.terrain, models.roads);
+
+const trees = await loadTrees('models/almensilla_trees.json', { castShadow: SHADOWS });
+scene.add(trees.root);
 
 const shadows = SHADOWS ? new SunShadows(renderer, sun, scene) : null;
 if (shadows) enableShadows({ casters: [buildingsRoot], receivers: [models.terrain, models.roads, buildingsRoot] });
+// Después de enableShadows: el LOD quita la sombra a los pretiles y la limita a los árboles cercanos
+const lod = LOD ? new LodManager({ parapets, trees: trees.root.children, treeShadows: SHADOWS }) : null;
 
 const center = urbanCenter(collisionMeshes);
 controls.target.copy(center);
@@ -94,13 +107,13 @@ function setMode(next) {
 
 // Acceso para depuración y pruebas
 const gpu = new GpuTimer(renderer.getContext());
-window.__almensilla = { scene, camera, renderer, collisionMeshes, center, character, player, shadows, gpu };
+window.__almensilla = { scene, camera, renderer, collisionMeshes, center, character, player, shadows, gpu, lod };
 
 const sceneInfo = () => {
   const { calls, triangles } = renderer.info.render;
   return { calls, triangles, geometries: renderer.info.memory.geometries };
 };
-statusEl.textContent = `Modelos cargados en ${(loadMs / 1000).toFixed(1)} s · ${collisionMeshes.length} edificios COL_ · fusión ${MERGE ? 'sí' : 'no'} · sombras ${SHADOWS ? 'sí' : 'no'}`;
+statusEl.textContent = `Modelos cargados en ${(loadMs / 1000).toFixed(1)} s · ${collisionMeshes.length} edificios COL_ · ${trees.count.toLocaleString('es-ES')} árboles · fusión ${MERGE ? 'sí' : 'no'} · sombras ${SHADOWS ? 'sí' : 'no'} · LOD ${LOD ? 'sí' : 'no'}`;
 
 const meter = new FpsMeter();
 const bench = BENCH_S > 0 ? new Benchmark(BENCH_S) : null;
@@ -123,7 +136,7 @@ renderer.setAnimationLoop((now) => {
     camera.lookAt(center);
     if (!bench.running) {
       const result = {
-        ...bench.result, ...gpu.summary(), merge: MERGE, shadows: SHADOWS, ...sceneInfo(),
+        ...bench.result, ...gpu.summary(), merge: MERGE, shadows: SHADOWS, lod: LOD, ...sceneInfo(),
         viewport: `${renderer.domElement.width}x${renderer.domElement.height}`,
         pixelRatio: renderer.getPixelRatio(), load_s: +(loadMs / 1000).toFixed(2),
       };
@@ -143,6 +156,7 @@ renderer.setAnimationLoop((now) => {
     shadows.update(focus, camera.position.distanceTo(focus));
   }
 
+  lod?.update(camera);
   gpu.begin();
   renderer.render(scene, camera);
   gpu.end();

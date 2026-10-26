@@ -9,6 +9,7 @@ const MODELS = {
   buildings: 'models/almensilla_buildings.glb',
 };
 export const COLLISION_PREFIX = 'COL_';
+export const PARAPET_PREFIX = 'PARAPET_';
 
 export async function loadModels(onProgress) {
   const loader = new GLTFLoader();
@@ -58,7 +59,12 @@ export function mergeBuildings(root) {
     geometries.forEach((g) => g.dispose());
   }
   for (const mesh of collisionMeshes) mesh.removeFromParent();
-  return { merged, collisionMeshes };
+
+  // Pretiles (PARAPET_<i>_<j>): decoración ya agrupada por tesela en el GLB; no colisionan
+  const parapets = [];
+  root.traverse((obj) => obj.isMesh && obj.name.startsWith(PARAPET_PREFIX) && parapets.push(obj));
+  for (const mesh of parapets) merged.add(mesh); // add() lo saca de su padre anterior
+  return { merged, collisionMeshes, parapets };
 }
 
 /** Centro del casco: mediana de los centros de los edificios (robusta frente a cortijos dispersos). */

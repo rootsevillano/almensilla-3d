@@ -14,7 +14,8 @@ y se usa la mediana por vía, acotada al rango de su clase. Fuera del casco: val
 Salidas:
   * `data/processed/osm_roads.geojson`  ejes en coordenadas locales con `width_m` y `width_source`.
   * `data/export/almensilla_roads.glb`   superficies planas en Y=ROAD_Y, recortadas al término municipal
-    (unión de CadastralZoning) y sin las huellas de Building, en teselas de TILE_M; nodos `ROAD_<grupo>_<i>_<j>` (caminable, sin `COL_`).
+    (unión de CadastralZoning) y sin las huellas de Building, en teselas de TILE_M; en calles urbanas la
+    calzada se separa de las aceras (losas de 15 cm cuyo canto es el bordillo, `ROAD_sidewalk_*`); nodos `ROAD_<grupo>_<i>_<j>` (caminable, sin `COL_`).
     Ejes glTF: X = Este, Y = arriba, Z = -Norte (igual que almensilla_buildings.glb).
 
 Uso:
@@ -79,7 +80,22 @@ COLORS = {
     "carriageway": (92, 94, 98, 255),
     "track": (168, 142, 104, 255),
     "pedestrian": (196, 186, 170, 255),
+    "sidewalk": (204, 196, 182, 255),
 }
+# Aceras: solo en calles urbanas de estas clases. La calzada es la anchura fachada-a-fachada menos dos aceras.
+SIDEWALK_CLASSES = {"secondary", "tertiary", "unclassified", "residential", "construction", "living_street"}
+CURB_HEIGHT_M = 0.15
+
+
+def sidewalk_width(street_width: float) -> float:
+    """Anchura de cada acera según la anchura total; en calles de menos de 6.5 m (casco antiguo) no hay."""
+    if street_width >= 9.0:
+        return 1.5
+    if street_width >= 7.5:
+        return 1.2
+    if street_width >= 6.5:
+        return 0.9
+    return 0.0
 PRINCIPAL = {"secondary", "tertiary", "residential", "construction"}  # criterio QA 3 del agente 04
 
 # Local (x=E, y=N, z=arriba) -> glTF (X=E, Y=arriba, Z=-N)
@@ -219,6 +235,47 @@ def build_surfaces(roads: gpd.GeoDataFrame, municipality, footprints=None) -> di
     return surfaces
 
 
+def assign_sidewalks(roads: gpd.GeoDataFrame, urban) -> None:
+    """Columna `sidewalk_m` (por lado): calles urbanas de SIDEWALK_CLASSES con anchura suficiente."""
+    widths = []
+    for geom, hw, w, is_area in zip(roads.geometry, roads["highway"], roads["width_m"], roads["is_area"]):
+        urban_way = not is_area and hw in SIDEWALK_CLASSES and urban.contains(geom.interpolate(0.5, normalized=True))
+        widths.append(sidewalk_width(w) if urban_way else 0.0)
+    roads["sidewalk_m"] = widths
+
+
+def split_sidewalks(roads: gpd.GeoDataFrame, carriageway) -> tuple:
+    """Divide la superficie `carriageway` en calzada y aceras (complementarias y disjuntas).
+
+    La calzada es la unión de los ejes con buffer de (anchura - 2·acera)/2; en los cruces gana la calzada,
+    así que las esquinas de acera salen solas. Se eliminan astillas de acera de menos de 20 cm.
+    """
+    sel = roads[(roads["group"] == "carriageway") & ~roads["is_area"]]
+    inner = shapely.union_all([
+        g.buffer((w - 2 * s) / 2.0, cap_style="round", join_style="round", quad_segs=4)
+        for g, w, s in zip(sel.geometry, sel["width_m"], sel["sidewalk_m"])
+    ]).simplify(0.05)
+    sidewalk = carriageway.difference(inner).buffer(-0.1, join_style="mitre").buffer(0.1, join_style="mitre")
+    sidewalk = sidewalk.intersection(carriageway)
+    return carriageway.difference(sidewalk), sidewalk
+
+
+def curb_mesh(polys: list[Polygon], y: float, height: float) -> trimesh.Trimesh | None:
+    """Aceras como losas extruidas: la cara lateral es el bordillo."""
+    meshes = []
+    for poly in polys:
+        if poly.area < 0.05:
+            continue
+        mesh = trimesh.creation.extrude_polygon(poly, height)
+        mesh.apply_translation([0.0, 0.0, y])
+        meshes.append(mesh)
+    if not meshes:
+        return None
+    mesh = trimesh.util.concatenate(meshes)
+    mesh.apply_transform(LOCAL_TO_GLTF)
+    return mesh
+
+
 def polygons_of(geom) -> list[Polygon]:
     if geom.is_empty:
         return []
@@ -272,6 +329,7 @@ def main(argv=None):
     municipality, urban, parcels = load_cadastre(args.cp_zip, origin)
     measured = [None] * len(roads) if args.no_measure else measure_widths(roads, urban, parcels)
     assign_widths(roads, measured)
+    assign_sidewalks(roads, urban)
 
     args.lines.parent.mkdir(parents=True, exist_ok=True)
     args.lines.unlink(missing_ok=True)
@@ -287,29 +345,35 @@ def main(argv=None):
     else:
         print(f"[aviso] {args.buildings} no existe: no se recortan las huellas de edificio", file=sys.stderr)
     surfaces = build_surfaces(roads, municipality, footprints)
+    # La unión de superficies no cambia (el terreno se recorta igual); la calzada se divide en calzada + aceras
+    surfaces["carriageway"], surfaces["sidewalk"] = split_sidewalks(roads, surfaces["carriageway"])
     scene = trimesh.Scene()
     minx, miny, maxx, maxy = municipality.bounds
     i0, j0 = int(np.floor(minx / args.tile)), int(np.floor(miny / args.tile))
     i1, j1 = int(np.floor(maxx / args.tile)), int(np.floor(maxy / args.tile))
     materials = {g: trimesh.visual.material.PBRMaterial(name=f"MAT_road_{g}", baseColorFactor=COLORS[g],
                                                         metallicFactor=0.0, roughnessFactor=0.95)
-                 for g in GROUPS}
+                 for g in COLORS}
     area_by_group = Counter()
     for group, surf in surfaces.items():
         for i in range(i0, i1 + 1):
             for j in range(j0, j1 + 1):
                 tile = box(i * args.tile, j * args.tile, (i + 1) * args.tile, (j + 1) * args.tile)
-                mesh = flat_mesh(polygons_of(surf.intersection(tile)), ROAD_Y)
+                piece = surf.intersection(tile)
+                if group == "sidewalk":
+                    mesh = curb_mesh(polygons_of(piece), ROAD_Y, CURB_HEIGHT_M)
+                else:
+                    mesh = flat_mesh(polygons_of(piece), ROAD_Y)
                 if mesh is None:
                     continue
                 mesh.visual = trimesh.visual.TextureVisuals(material=materials[group])
                 name = f"ROAD_{group}_{i}_{j}"
                 mesh.metadata = {"group": group, "tile": [i, j], "tile_m": args.tile,
-                                 "area_m2": round(float(mesh.area), 1)}
+                                 "area_m2": round(float(piece.area), 1)}
                 scene.add_geometry(mesh, node_name=name, geom_name=name)
-                area_by_group[group] += mesh.area
+                area_by_group[group] += piece.area
     scene.metadata = {"source": args.osm.name, "axes": "X=East, Y=Up, Z=-North", "units": "m",
-                      "road_y_m": ROAD_Y, "walkable_prefix": "ROAD_"}
+                      "road_y_m": ROAD_Y, "curb_height_m": CURB_HEIGHT_M, "walkable_prefix": "ROAD_"}
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_bytes(scene.export(file_type="glb"))
 
@@ -320,6 +384,8 @@ def main(argv=None):
         "output": args.output.name, "lines": args.lines.name, "origin_epsg25829": list(origin),
         "ways": len(roads), "ways_by_group": roads["group"].value_counts().to_dict(),
         "width_sources": roads["width_source"].value_counts().to_dict(),
+        "ways_with_sidewalk": int((roads["sidewalk_m"] > 0).sum()),
+        "sidewalk_m_by_count": roads.loc[roads["sidewalk_m"] > 0, "sidewalk_m"].value_counts().to_dict(),
         "municipality_km2": round(municipality.area / 1e6, 3),
         "nodes": len(scene.geometry),
         "area_m2_by_group": {g: round(a) for g, a in area_by_group.items()},
