@@ -1,0 +1,45 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #bcd6ec;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+#viewport {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+}
+
+#hud {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  max-width: calc(100vw - 24px);
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(20, 24, 28, 0.72);
+  color: #f2f2f2;
+  font-size: 12px;
+  line-height: 1.5;
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+
+#stats {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  white-space: pre;
+}
+
+#help {
+  margin-top: 4px;
+  opacity: 0.7;
+}
+
+@media (max-width: 600px) {
+  #help {
+    display: none;
+  }
+}

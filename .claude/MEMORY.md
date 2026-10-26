@@ -82,7 +82,7 @@ Todos los GML de AD y BU van en **ISO-8859-1**; los de CP en **UTF-8** (lo gesti
 #### CadastralParcel / CadastralZoning
 - Geometría `geometry/gml:MultiSurface/gml:surfaceMember/gml:Surface/gml:patches/gml:PolygonPatch`.
 - Parcel: `areaValue` (m²), `label`, `nationalCadastralReference`, `referencePoint/gml:Point/gml:pos`.
-- Zoning: `levelName` (MANZANA/POLIGONO), `nationalCadastalZoningReference` (sic, errata INSPIRE), `originalMapScaleDenominator`.
+- Zoning: `levelName` (MANZANA/POLIGONO, con espacio final en el dato), `nationalCadastalZoningReference` (sic, errata INSPIRE), `originalMapScaleDenominator`.
 - La unión de CadastralZoning/Parcel sirve como **límite municipal completo** (ver problema del límite OSM).
 
 #### Address (AD)
@@ -162,16 +162,169 @@ Todos los GML de AD y BU van en **ISO-8859-1**; los de CP en **UTF-8** (lo gesti
 - Para el agente 02: 2793 mallas implican ~2793 draw calls; conviene fusionarlas por material en tiempo de carga
   (regla 2 del agente 02), conservando los nombres `COL_` para las colisiones.
 
-### Pendiente / bloqueos
-
 ### 2026-10-25 · Triangulador para extrusión
 - Instalado `mapbox-earcut` 2.1.0 (añadido a `requirements.txt`); `trimesh.creation.extrude_polygon` ya funciona.
 - Verificado: caja 10×10×3 → 8 vértices / 12 caras, estanca, winding consistente, volumen 300 m³ exacto.
   Parte real `41010A00200003_part1` (2 patios interiores, 1 planta → 3 m): 40 vértices / 84 caras, estanca,
   volumen = área × altura (5048.015 m³), z ∈ [0, 3]. Volumen positivo → normales hacia fuera con la orientación CCW del extractor.
-- Decidir qué hacer con las 184 partes de 0 plantas: provisionalmente se omiten en el GLB (ver sección GLB).
-- `almensilla_terrain.glb` y `almensilla_roads.glb` aún no existen. Al añadir terreno con cota, habrá que asentar los edificios sobre él.
+
+### 2026-10-25 · Git
+- Commit `561c61b` en la rama `gis/catastro-buildings-glb` (local). El push falló: «Repository not found»
+  (repo privado `rootsevillano/almensilla-3d`; credenciales sin acceso). No hay `gh` instalado.
+- `.gitignore`: `data/processed/*` (salvo `.gitkeep`) y `__pycache__/`.
+- **Desde 2026-10-26 el usuario gestiona Git/GitHub a mano**: los agentes no hacen commit, push, ramas ni PR.
+
+### 2026-10-26 · GLB de viales (`data/export/almensilla_roads.glb`)
+- Script: `tools/gis/build_roads_glb.py`. Entradas: OSM, `A.ES.SDGC.CP.41010.zip` (zoning + parcelas),
+  `data/processed/catastro_buildings.geojson` (huellas) y `catastro_buildings.meta.json` (origen local compartido).
+  Salidas: `data/processed/osm_roads.geojson` (ejes con `width_m`, `width_source`) y el GLB.
+- **Inspección OSM (viales):** 614 ways; ninguna relación con highway; 0 referencias a nodos ausentes.
+  `area=yes` solo en 6 `pedestrian` (plazas → polígono). 14 rotondas cerradas (`junction=roundabout`).
+  `tunnel=yes` 2 (omitidos). `bridge=*` 30 (aplanados a rasante: todavía no hay terreno).
+  `width` solo 1 vez y erróneo (`0.6` en carril bici, descartado por el rango de clase).
+  **8 `highway=construction` sin subtipo** (IDs 1391792120–138, 968 m): están dentro de manzanas catastrales,
+  miden 8.1 m → calles del sector F; se tratan como `residential`.
+- **Trampa CP:** `CadastralZoning.levelName` (columna GDAL `LocalisedCharacterString`) lleva **espacio final**:
+  `'MANZANA '`, `'POLIGONO '`. Comparar con `.str.strip()`.
+- **Término municipal** = unión de CadastralZoning: 1 polígono sin huecos, 14.035 km² (sustituye al límite OSM incompleto).
+- **Anchuras reales medidas** (rayos perpendiculares cada 10 m hasta el borde de parcela, en manzanas + 40 m;
+  en suelo urbano el Catastro no parcela las calles → hueco = fachada a fachada):
+  residential mediana 9.4 m (p25 8.1, p75 12.3); tertiary 13.3; construction 8.1; pedestrian 4.7; living_street 9.3.
+  Avenidas con mediana/zonas verdes dan valores altos (Miró 41 m, Tolerancia 33 m) → se acota por clase.
+- **Regla de anchura** (por vía): `width` OSM si está en rango > mediana medida acotada a [mín, máx] de la clase >
+  motorway por `lanes`×3.5+3 > valor por defecto de la clase. Tabla `CLASSES` en el script.
+  Resultado: 144 medidas, 90 medidas acotadas, 9 por lanes, 369 por defecto (rurales/sin muestras).
+- **Geometría:** buffer redondo de los ejes, unión por grupo (`carriageway` > `track` > `pedestrian`, cada grupo recortado
+  con los anteriores → disjuntos), simplificación 5 cm **antes** de recortar, recorte al término y **resta de huellas
+  de Building** (sin ella, 5123 m² = 0.87 % de la calzada caía bajo edificios por desalineación OSM–Catastro).
+- **GLB:** superficies planas en Y = 0.02 m, teselas de 500 m, nodos `ROAD_<grupo>_<i>_<j>` (102), sin `COL_`
+  (caminable). 3 materiales `MAT_road_<grupo>`. Mismos ejes que edificios (X=E, Y=arriba, Z=−N).
+  Área: calzada 586 947 m², pistas 72 474 m², peatonal 21 444 m². 8859 triángulos, 0.26 MB.
+- **Trampa float32:** el GLB guarda vértices en float32 (~0.2 mm de resolución a 3 km del origen) y astillas de
+  <0.002 m² se voltean al cuantizar (6 caras con normal −Y). Se orienta tras redondear a float32 y se descartan las
+  caras de área nula en float32. Verificar siempre releyendo con `trimesh.load(..., process=False)`.
+- **Validación:** `validate_glb.py` → passed. QA: 0 NaN, 0 caras sin normal +Y, Y = 0.02 en todos los vértices,
+  0 m² de solape entre grupos, 0 m² fuera del término, 0 m² bajo edificios, nombres únicos `ROAD_`.
+- **Criterio QA 3 (6–10 m en calles principales):** mediana 9.11 m; el 76.6 % de la longitud principal
+  (secondary/tertiary/residential/construction) está en 6–10 m; 18 km superan 10 m porque son **medidas reales**
+  (Alisma 10.2, Solidaridad 10.2, Andalucía, Miró…), y 1.5 km quedan por debajo de 6 m. Lo debe valorar el agente 04.
+
+### 2026-10-26 · GLB de terreno (`data/export/almensilla_terrain.glb`)
+- Script: `tools/gis/build_terrain_glb.py`; reutiliza `build_roads_glb.py` (origen, término municipal,
+  `build_surfaces`, `flat_mesh`) para que límite, origen y superficies sean idénticos. Requiere ejecutar antes
+  `build_roads_glb.py` (lee `data/processed/osm_roads.geojson`); `--no-cut-roads` lo evita.
+- **Plano en Y=0** (no hay MDT) con la forma del término municipal (unión de CadastralZoning, 14.0346 km²),
+  **menos las superficies de vial**, para que terreno (Y=0) y viales (Y=0.02) no se solapen y no haya z-fighting.
+  Las huellas de edificio sí forman parte del terreno (los edificios apoyan en Y=0).
+- Teselas de 500 m (las mismas que los viales), 85 nodos `TERRAIN_<i>_<j>` (caminable, sin `COL_`), 1 material
+  `MAT_terrain`. 9187 triángulos, 0.27 MB. Bounds glTF X [−3108.02, 3108.11], Z [−2114.70, 2113.87].
+- Áreas: terreno 13 353 688 m² + viales 680 865 m² = 14 034 553 m² = término municipal.
+- **Validación:** `validate_glb.py` → passed. QA del GLB releído (`process=False`): 0 NaN, 0 caras sin normal +Y,
+  todos los vértices en Y=0, 0 triángulos de área 0, nombres únicos `TERRAIN_`; edificios dentro de los bounds.
+- Costura terreno–viales: en float64, solape y huecos = 0 m². En los GLB (float32) salen ~15 m² de cada uno, que
+  equivalen a 0.09 mm de desplazamiento medio en 165 km de borde (resolución float32 a 3.1 km: 0.24 mm) → despreciable.
+- Escena completa: edificios + viales + terreno = 0.26 + 0.27 + 5.01 MB, todo en el mismo sistema (X=E, Y=arriba, Z=−N).
+
+### 2026-10-26 · Visor mínimo (agente 02) — `app/`
+- Vite 8.3.5 + three 0.186.1 (versiones exactas en `app/package.json`), Node 24.14.1 / npm 11.11.0.
+  `.gitignore`: `node_modules/`, `app/dist/`.
+- `npm --prefix app run dev` → http://localhost:5173 (`predev` ejecuta `sync-models`).
+  `app/scripts/sync-models.mjs` valida los 3 GLB con `tests/contracts/validate_glb.py` (regla 4) y solo entonces
+  los copia de `data/export/` a `app/public/models/` (único directorio que lee el visor, contrato 02↔01).
+  Los GLB quedan duplicados en `app/public/models/` (~5.5 MB): valorar si ignorarlos en Git.
+- Módulos: `src/scene.js` (renderer ACES/sRGB, cielo `#bcd6ec`, niebla lineal 700–3600 m que oculta el borde sin
+  suelo, HemisphereLight + sol direccional desde el SO, OrbitControls con amortiguación y sin bajar del horizonte,
+  cámara near 1 m / far 8000 m), `src/models.js` (GLTFLoader, fusión de edificios, centro del casco = mediana de los
+  centros de los edificios), `src/stats.js` (FPS en HUD + benchmark), `src/main.js`.
+- Los GLB no llevan normales (solo POSITION): el GLTFLoader activa `flatShading` solo, que es lo correcto para extrusiones.
+- **Fusión de edificios** (regla 2): las 2793 mallas `COL_` se fusionan en 7 (una por material) para el render;
+  las originales quedan fuera de la escena en `window.__almensilla.collisionMeshes` para el agente 03.
+  Terreno y viales se mantienen por teselas (frustum culling). `?merge=0` desactiva la fusión.
+- **Benchmark** `?bench=20`: 2 s de calentamiento + 20 s de órbita automática (r=900 m, h=420 m) alrededor del casco;
+  resultado en `window.__bench` y en consola. rAF está limitado por el refresco del monitor (aquí 144 Hz).
+- **Medidas** (panel de navegador integrado de Claude, visible, viewport emulado de 1920×1080, DPR 1.25 → lienzo 2400×1350):
+  - Con fusión: **141 FPS de media**, 1 % low 71.9, p50 6.9 ms, p95 7.1 ms, p99 13.9 ms, ~105 draw calls,
+    231 k triángulos, carga 0.21 s. Cumple el criterio QA 2 (≥60 FPS a 1080p) en esta máquina.
+  - Sin fusión: ~2180 draw calls, p50 7.0 ms, p95 14 ms (las medias de las 2 tandas no valen: hubo pausas de
+    1–15 s porque la página dejó de estar a la vista).
+  - Lienzo pequeño (462×298): 144 FPS (tope del monitor), p99 7.1 ms.
+  - Pendiente: medir en un navegador normal a pantalla completa en el "equipo estándar" del criterio (agente 04).
+- El panel de navegador busca `.claude/launch.json` en la carpeta raíz de la sesión; si la sesión se abre en
+  `C:\Github\almensilla-3d`, sirve `.claude/launch.json` (config `viewer`).
+
+### 2026-10-26 · Personaje en tercera persona (agente 03) — `app/src/character/`
+- **Estilo pedido por el usuario:** monigote 3D blanco tipo maniquí (referencia: imagen de stock «hombre negando con el
+  dedo» de magnific.com, solo vista; no se descargó ni copió). Modelado **procedural** con primitivas de Three.js
+  (`Monigote.js`): cabeza de huevo sin cara (esfera r=0.26 escalada 1.12 en Y), torso de cápsula aplanado, brazos
+  cortos con manos esféricas, piernas rechonchas con pies esféricos alargados. Altura ~1.8 m, origen en los pies,
+  mira a +Z local. Material blanco satinado con algo de emisión (sin ella, a contraluz se veía gris).
+  Sombra difusa bajo los pies (textura radial en un canvas), porque la escena no tiene mapas de sombra.
+- **Animación por código:** fase de paso ligada a la distancia recorrida (zancada 1.35 m), balanceo opuesto de
+  piernas y brazos con más amplitud al correr, rebote vertical, inclinación hacia delante, contoneo de hombros y
+  respiración en reposo.
+- **Controlador** (`controller.js`): WASD/flechas relativas a la cámara, Mayús para correr (3 → 8 m/s),
+  aceleración de 14 m/s² y frenado de 18 m/s², giro suave hacia la dirección de marcha, Espacio para saltar
+  (gravedad 18 m/s², ~0.84 m). Raycast hacia abajo contra `TERRAIN_*`/`ROAD_*`: si no hay suelo (fuera del término),
+  no avanza. Aparece en el punto de calle libre más cercano al centro del casco (búsqueda en espiral sobre `ROAD_*`).
+- **Colisión** (`collision.js`, `FootprintCollider`): se extraen de las mallas `COL_` las aristas inferiores de sus
+  caras verticales (64 754 segmentos = contorno exacto de las huellas, patios incluidos; ~80–110 ms al cargar) en una
+  rejilla de 8 m; el personaje es un círculo de r=0.32 m en planta que se empuja fuera de los muros (3 iteraciones).
+  Válido porque los edificios son extrusiones desde Y=0 y el personaje siempre está por debajo de las cubiertas.
+- **Cámara de persecución:** órbita con arrastre del ratón y zoom con la rueda (1.2–14 m), amortiguada; un rayo desde
+  la altura de los ojos contra las mallas `COL_` la acerca **al instante** si hay muro (margen de 0.3 m) y la aleja
+  despacio. No baja del suelo. `camera.near` = 0.2 m en modo personaje y 1 m en vista aérea.
+- `main.js`: modo personaje por defecto; tecla **C** alterna con la vista aérea orbital; `?bench` sigue midiendo
+  solo la escena con cámara orbital (no crea personaje). `window.__almensilla.player` / `.character` para pruebas.
+- **Pruebas** (en el navegador, automatizadas con JS):
+  - Andar 2 s → 5.95 m; correr 1 s → 7.55 m (incluyen aceleración y frenado); salto 0.82 m (teórico 0.84), aterriza.
+  - Correr 2 s contra un muro de 10.7 m: se detiene a 0.320 m (= radio), sin penetrar.
+  - Paseo aleatorio de 20 000 pasos a velocidad de carrera (2.56 km, 245 contactos): distancia mínima a muro 0.320 m,
+    0 penetraciones. (5000 puntos aleatorios a ±0.3 m de muros dan "penetraciones", pero son puntos dentro de edificios
+    o en medianeras compartidas, inalcanzables desde la calle.)
+  - Cámara con el muro a 1.01 m: se coloca a 0.71 m, por delante del muro.
+  - Límite del término: corriendo hacia fuera se detiene a 5 cm del borde.
+  - Coste de CPU por fotograma: `player.update` 0.57 ms (raycast de cámara 0.26 ms, suelo 0.10 ms, colisión <0.01 ms).
+  - FPS en modo personaje (1080p emulado, lienzo 2400×1350, panel visible): 144 media, 1 % low 140.8, máx 7.4 ms.
+    Con el panel oculto salen 48 FPS (= 144/3): es estrangulamiento del navegador, no coste real.
+- La captura de pantalla del panel con viewport emulado puede mostrar el lienzo sin redimensionar; la página informa
+  de tamaños correctos (artefacto de la captura).
+
+### 2026-10-26 · Sombras del sol (agente 02) — `app/src/shadows.js`
+- Un único mapa de sombras de 2048² (`PCFShadowMap`) de la luz direccional, con la cámara ortográfica **centrada en
+  el foco**: el personaje en modo a pie, `controls.target` en la vista aérea y el centro del casco en `?bench`.
+  Radio = 1.1 × distancia cámara–foco, por escalones de potencias de 2 entre 32 y 512 m (texel de 3.1 cm a pie,
+  25 cm a 256 m). El centro se ajusta a la rejilla de texels en el espacio de la luz para que la sombra no tiemble.
+  `?shadows=0` las desactiva.
+- Proyectan sombra: edificios y monigote (su sombra difusa se oculta). Reciben: terreno, viales y edificios.
+- Los GLB no traen normales: `enableShadows` las genera (geometría no indexada → normales planas) para que
+  `normalBias` funcione. bias −0.0004, normalBias 0.03; sin acné ni peter-panning visibles.
+- **Edificios fusionados por material y tesela de 500 m** (106 mallas en vez de 7): con una sola malla por material,
+  la pasada de sombras dibujaba el pueblo entero (217 k triángulos) aunque el mapa cubriera 64 m.
+- `GpuTimer` en `stats.js` (`EXT_disjoint_timer_query_webgl2`): tiempo de GPU por fotograma, que no depende del tope de
+  refresco; aparece en el HUD y en `window.__bench` (gpu_ms_p50/p95/p99).
+- **Medidas** (1080p emulado, lienzo 2400×1350, panel visible, monitor de 144 Hz; GPU ms p50 / p99):
+
+  | Escena | Sin sombras | Con sombras | Coste |
+  |---|---|---|---|
+  | Personaje andando/corriendo (teselas) | 2.10 / 3.51 ms | 2.99 / 4.13 ms | +0.9 ms |
+  | Bench orbital r=900 m (teselas) | 3.10 / 4.41 ms | 3.93 / 5.28 ms | +0.8 ms |
+  | Personaje, edificios sin teselas (antes) | 3.02 / 3.85 ms | 4.36 / 5.04 ms | +1.3 ms |
+  | Bench orbital, sin teselas (antes) | 2.86 / 3.96 ms | 3.80 / 5.15 ms | +0.9 ms |
+
+  FPS: 143.4–144 de media y 1 % low 140.8 en todos los casos (tope del monitor). Draw calls con sombras:
+  104 a pie y 188 en el bench orbital. Las teselas encarecen un poco la vista aérea lejana sin sombras
+  (155 frente a 105 draw calls, +0.24 ms) y abaratan mucho la vista a pie.
+
+### Pendiente / bloqueos
+- Push/PR de `gis/catastro-buildings-glb` y de los cambios de viales, terreno, visor, personaje y sombras: lo hace el usuario a mano.
+- Sombras: fuera del radio del mapa (≤512 m del foco) no hay sombra; en vista aérea muy lejana se nota el corte
+  (lo suaviza la niebla). Si hiciera falta: cascadas (CSM) o desvanecer la sombra en el borde del mapa.
+- Personaje: la cámara muy cerca (contra un muro) queda dentro de la cabeza; se podría atenuar el monigote cuando la
+  cámara está a menos de ~1 m. Huecos entre edificios más estrechos que 0.64 m no son transitables (es lo deseado).
+- Controles solo de teclado y ratón (sin táctil ni mando).
+- Decidir qué hacer con las 184 partes de 0 plantas: provisionalmente se omiten en el GLB de edificios.
+- Relieve: el terreno es plano. Para cota real haría falta el MDT05 del CNIG/IGN (lo descarga el usuario); entonces
+  habrá que asentar edificios y viales sobre el MDT y resolver los puentes (`bridge=*`, `layer`).
+- Fuera del término municipal no hay suelo: de momento lo tapa la niebla (700–3600 m); con zoom lejano se ve el borde.
+- Aceras/calzada no se distinguen: la superficie de vial es de fachada a fachada.
 - trimesh no tiene `networkx` (algunas utilidades de `trimesh.repair` fallan); no hace falta para la extrusión.
-- Extractor OSM de viales (`highway=*` → polilíneas + anchura por tipo; QA exige 6–10 m en calles principales)
-  y límite municipal desde CP.
-- Decidir si `data/processed/` se versiona (≈7 MB de GeoJSON) o se añade a `.gitignore`.

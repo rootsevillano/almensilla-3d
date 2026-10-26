@@ -1,0 +1,20 @@
+{
+  "name": "almensilla-3d-viewer",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "sync-models": "node scripts/sync-models.mjs",
+    "predev": "npm run sync-models",
+    "dev": "vite",
+    "prebuild": "npm run sync-models",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "vite": "8.3.5"
+  }
+}
