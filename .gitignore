@@ -7,3 +7,7 @@ __pycache__/
 # Dependencias del visor
 node_modules/
 app/dist/
+
+# Capa lógica y map-packs para WorldOpen: regenerables; el map-pack se publica como Release (WorldOpen D7)
+data/export/logic/
+data/export/mappack/

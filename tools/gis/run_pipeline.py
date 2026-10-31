@@ -12,6 +12,8 @@ Pasos (cada uno es un script de tools/gis/, ejecutado con `python -P`; ver `.cla
   terrain      build_terrain_glb          data/export/almensilla_terrain.glb (necesita osm_roads)
   trees        build_trees                data/export/almensilla_trees.json (necesita osm_roads)
   ortho        build_ortho_textures       data/export/ortho/
+  logic        build_logic                data/export/logic/ (edificios, grafo de calles, cotas) para WorldOpen
+  pack         pack_map                   data/export/mappack/<id>-<versión>/ anonimizado (falla si queda algo real)
 Después, opcionalmente: `--sync` (npm run sync-models: contratos + copia a app/public/models) y `--test` (pytest).
 
 Uso:
@@ -42,6 +44,8 @@ STEPS = [
     ("terrain", "build_terrain_glb.py"),
     ("trees", "build_trees.py"),
     ("ortho", "build_ortho_textures.py"),
+    ("logic", "build_logic.py"),
+    ("pack", "pack_map.py"),
 ]
 NAMES = [name for name, _ in STEPS]
 

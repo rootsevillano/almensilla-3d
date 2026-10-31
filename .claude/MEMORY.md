@@ -710,3 +710,21 @@ condiciones", AccessConstraints **"CC BY 4.0 scne.es"** (atribución obligatoria
 - Puentes (`bridge=*`, `layer`): aplanados sobre el terreno.
 - Fuera del término municipal no hay suelo: lo tapa la niebla; con zoom muy lejano se ve el borde.
 - trimesh no tiene `networkx` (algunas utilidades de `trimesh.repair` fallan); no hace falta para la extrusión.
+
+### 2026-10-30 · Capa lógica y map-pack para WorldOpen (agentes 01/04)
+- Pasos nuevos `logic` (`tools/gis/build_logic.py`) y `pack` (`tools/gis/pack_map.py`) en `run_pipeline.py`.
+  Salidas en `data/export/logic/` y `data/export/mappack/<id>-<versión>/` (ignoradas por Git: el pack va en Releases).
+- **Edificios:** 2 793 (los de partes con plantas), huella simplificada 0.2 m, `baseY` = mínimo de `sample_mesh` en la
+  huella, `heightM` = máximo de las partes (LiDAR). Portal: dirección de AD asociada por la referencia catastral de su
+  `localId` (2 911 directas, 229 por cercanía ≤ 25 m); 2 714 edificios con portal real, el resto en la fachada más
+  cercana a la calle.
+- **Grafo peatonal:** ejes de `osm_roads.geojson` sin autovía ni áreas. ⚠️ Simplificar cada vía por separado
+  borraba vértices de cruce compartidos y dejaba 208 componentes (la mayor con el 22 % de nodos): ahora cada vía se
+  parte en sus cruces antes de simplificar (1.5 m) → 12 componentes; se publica la mayor (2 119 nodos, 2 424 tramos).
+- **Anonimización (`pack_map.py`):** ids opacos `r1-bNNNN` (tabla privada en `data/processed/logic_id_map.json`),
+  nombres de calle inventados y estables, sin origen absoluto, GLB de terreno y viales sin `extras` (llevaban el nombre
+  del fichero OSM y el código INE), árboles sin fuente ni origen; no se publica el GLB de edificios (nodos con refcat).
+  La auditoría borra el paquete si queda algo real. `tests/test_mappack.py` (9) comprueba también que la auditoría
+  **detecta** datos reales en las fuentes sin limpiar. Suite completa: 43 tests en verde.
+- Map-pack `valdeolivo-1.0.0`: 10.5 MB. Instalado en WorldOpen con `worldopen mappack install`.
+- Sin commits en este repo (el usuario gestiona Git).
